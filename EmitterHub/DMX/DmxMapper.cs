@@ -1,1 +1,0 @@
-// Association entité -> Canaux DMX

@@ -1,1 +1,0 @@
-// Réprésentation d'une entité et de sa couleur
