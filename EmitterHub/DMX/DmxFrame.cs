@@ -1,0 +1,1 @@
+// Classe représentant une frame DMX
