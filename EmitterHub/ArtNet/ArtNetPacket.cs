@@ -1,1 +1,0 @@
-// Encapsulation d'un packet ArtNet
