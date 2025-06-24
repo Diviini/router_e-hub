@@ -31,5 +31,27 @@ public class ArtNetSender : IDisposable
     /// <summary>
     /// Envoie une trame DMX via ArtNet
     /// </summary>
-    public async Task SendDmxFrameAsync(DmxFrame frame) { }
+    public async Task SendDmxFrameAsync(DmxFrame frame)
+    {
+        if (frame == null || !frame.HasData()) return;
+
+        lock (_lockObject)
+        {
+            var now = DateTime.Now;
+            if ((now - _lastSendTime) < _minSendInterval)
+                return;
+            _lastSendTime = now;
+        }
+
+        var packet = new ArtNetPacket(frame);
+
+        if (!_endpoints.TryGetValue(frame.TargetIP, out var endpoint))
+        {
+            endpoint = new IPEndPoint(IPAddress.Parse(frame.TargetIP), ArtNetPacket.ARTNET_PORT);
+            _endpoints[frame.TargetIP] = endpoint;
+        }
+
+        await _udpClient.SendAsync(packet.PacketData, packet.PacketSize, endpoint);
+        PacketsSent++;
+    }
 }
