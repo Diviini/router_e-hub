@@ -54,4 +54,11 @@ public class ArtNetSender : IDisposable
         await _udpClient.SendAsync(packet.PacketData, packet.PacketSize, endpoint);
         PacketsSent++;
     }
+
+    public void Dispose()
+    {
+        _udpClient?.Close();
+        _udpClient?.Dispose();
+        Console.WriteLine($"ArtNet Sender arrêté. Paquets envoyés: {PacketsSent}");
+    }
 }
