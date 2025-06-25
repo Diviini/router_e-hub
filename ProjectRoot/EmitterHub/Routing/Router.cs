@@ -28,10 +28,29 @@ public class Router
     /// <summary>
     /// Ajoute une plage d'entités à router
     /// </summary>
-    public void AddEntityRange(ushort startId, ushort endId, string targetIP, int startUniverse, int endUniverse)
+    /// <summary>
+    /// Ajoute une plage d'entités avec mode DMX personnalisé et canal de départ
+    /// </summary>
+    public void AddEntityRange(
+        ushort entityStart,
+        ushort entityEnd,
+        string ip,
+        ushort universeStart,
+        ushort universeEnd,
+        string channelMode,
+        ushort dmxStartChannel)
     {
-        _mapper.AddEntityRangeMapping(startId, endId, targetIP, startUniverse, endUniverse);
+        _mapper.AddEntityRangeMapping(
+            entityStart,
+            entityEnd,
+            ip,
+            universeStart,
+            universeEnd,
+            channelMode,
+            dmxStartChannel
+        );
     }
+
 
     /// <summary>
     /// Démarre l'écoute et le routage en tâche de fond

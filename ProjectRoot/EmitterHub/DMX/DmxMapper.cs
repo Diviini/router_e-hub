@@ -39,19 +39,27 @@ public class DmxMapper
     /// <summary>
     /// Ajoute un mapping pour une plage d'entités
     /// </summary>
-    public void AddEntityRangeMapping(ushort startEntity, ushort endEntity, string targetIP, int startUniverse, int endUniverse)
-    {
-        int totalEntities = endEntity - startEntity + 1;
-        int universesCount = endUniverse - startUniverse + 1;
+    public void AddEntityRangeMapping(
+    ushort entityStart,
+    ushort entityEnd,
+    string ip,
+    ushort universeStart,
+    ushort universeEnd,
+    string channelMode,
+    ushort dmxStartChannel)
+{
+
+        int totalEntities = entityEnd - entityStart + 1;
+        int universesCount = universeEnd - universeStart + 1;
         int entitiesPerUniverse = 170; // Maximum RGB LEDs per universe (512/3)
 
-        ushort currentEntity = startEntity;
-        int currentUniverse = startUniverse;
-        int currentChannel = 1;
+        ushort currentEntity = entityStart;
+        ushort currentUniverse = universeStart;
+        ushort currentChannel = 1;
 
         for (int i = 0; i < totalEntities; i++)
         {
-            AddEntityMapping(currentEntity, targetIP, currentUniverse, currentChannel);
+            AddEntityMapping(currentEntity, ip, currentUniverse, currentChannel);
 
             currentEntity++;
             currentChannel += 3; // RGB = 3 canaux

@@ -91,7 +91,7 @@ public class EHubReceiver : IDisposable
         }
         else if (type == 1)
         {
-            Console.WriteLine("🟠 Message de configuration reçu (type 1) — ignoré");
+            // Console.WriteLine("🟠 Message de configuration reçu (type 1) — ignoré");
         }
     }
 
@@ -111,7 +111,7 @@ public class EHubReceiver : IDisposable
 
         var updated = new Dictionary<ushort, EntityState>();
 
-        Console.WriteLine($"\n🟢 Update reçu : {entityCount} entités");
+        // Console.WriteLine($"\n🟢 Update reçu : {entityCount} entités");
 
         for (int i = 0; i < entityCount; i++)
         {
@@ -128,7 +128,7 @@ public class EHubReceiver : IDisposable
             _entities[id] = entity;
             updated[id] = entity;
 
-            Console.WriteLine($"🔸 Entity {id:0000} : R={r} G={g} B={b} W={w}");
+            // Console.WriteLine($"🔸 Entity {id:0000} : R={r} G={g} B={b} W={w}");
         }
 
         EntitiesUpdated?.Invoke(updated);

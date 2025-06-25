@@ -21,7 +21,7 @@ class Program
         var router = new Router(receiver, sender);
 
         // Configuration d'exemple pour l'écran LED
-        SetupLedScreenRouting(router);
+        CsvMappingLoader.Load("EmitterHub/Config/mapping.csv", router);
 
         // Démarrage du routage
         await router.StartAsync();
@@ -48,29 +48,4 @@ class Program
         Console.WriteLine("Arrêt du routage.");
     }
 
-    /// <summary>
-    /// Configure le routage pour l'écran LED selon les spécifications
-    /// </summary>
-    private static void SetupLedScreenRouting(Router router)
-    {
-        // Configuration pour l'écran LED 128x128
-        // Selon les spécifications du document
-
-        // Premier quart - Contrôleur 192.168.1.45
-        router.AddEntityRange(100, 4858, "192.168.1.45", 0, 31);
-
-        // Deuxième quart - Contrôleur 192.168.1.46  
-        router.AddEntityRange(5100, 9858, "192.168.1.46", 32, 63);
-
-        // Troisième quart - Contrôleur 192.168.1.47
-        router.AddEntityRange(10100, 14858, "192.168.1.47", 64, 95);
-
-        // Quatrième quart - Contrôleur 192.168.1.48
-        router.AddEntityRange(15100, 19858, "192.168.1.48", 96, 127);
-
-        Console.WriteLine("Configuration écran LED chargée:");
-        Console.WriteLine("- 4 contrôleurs configurés");
-        Console.WriteLine("- 128 univers ArtNet");
-        Console.WriteLine("- ~16,384 entités mappées");
-    }
 }
