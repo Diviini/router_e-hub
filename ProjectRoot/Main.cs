@@ -12,8 +12,8 @@ class Program
         Console.WriteLine("====================================");
 
         // Configuration par défaut
-        int listenPort = 6454;  // Port ArtNet standard
-        int eHubUniverse = 0;   // Univers eHuB par défaut
+        int listenPort = 8765;  // Port ArtNet standard
+        int eHubUniverse = 1;   // Univers eHuB par défaut
 
         // Initialisation des composants
         var receiver = new EHubReceiver(listenPort, eHubUniverse);
