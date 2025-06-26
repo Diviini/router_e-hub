@@ -40,7 +40,16 @@ class Program
                 Console.WriteLine($"Messages eHuB reçus: {receiver.MessagesReceived}");
                 Console.WriteLine($"Entités actives: {receiver.ActiveEntities}");
                 Console.WriteLine($"Paquets ArtNet envoyés: {sender.PacketsSent}");
+
+                var map = receiver.GetIndexToEntityMapping();
+                Console.WriteLine($"🔢 Mapping Index → Entity : {map.Count} entrées");
+
+                foreach (var pair in map.Take(10)) // Affiche les 10 premiers
+                {
+                    Console.WriteLine($"  Index {pair.Key} → Entity {pair.Value}");
+                }
             }
+
         }
 
         // Arrêt propre

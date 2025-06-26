@@ -70,8 +70,10 @@ public class Router
                     var entities = _receiver.GetCurrentEntities();
                     _mapper.UpdateEntities(entities);
 
-                    // Envoie les trames DMX actives via ArtNet
-                    foreach (var frame in _mapper.GetActiveFrames())
+                    var frames = _mapper.GetActiveFrames();
+                    
+                 
+                    foreach (var frame in frames)
                     {
                         LogDmxFrameToFile(frame); // ← Ajout du log
                         await _sender.SendDmxFrameAsync(frame);

@@ -13,6 +13,8 @@ public class EHubReceiver : IDisposable
     private readonly int _targetUniverse;
     private readonly CancellationTokenSource _cancellationTokenSource;
     private readonly Dictionary<ushort, EntityState> _entities;
+    private readonly Dictionary<ushort, ushort> _indexToEntityId = new();
+
 
     public event Action<Dictionary<ushort, EntityState>>? EntitiesUpdated;
 
@@ -91,9 +93,39 @@ public class EHubReceiver : IDisposable
         }
         else if (type == 1)
         {
-            // Console.WriteLine("🟠 Message de configuration reçu (type 1) — ignoré");
+            await ProcessConfigMessage(buffer);
         }
     }
+
+    private async Task ProcessConfigMessage(byte[] buffer)
+    {
+        // Minimum = header eHuB (6) + 1 groupe (8) = 14 octets
+        if (buffer.Length < 14) return;
+
+        int offset = 2; // On saute type (1 byte) et universe (1 byte)
+
+        while (offset + 8 <= buffer.Length)
+        {
+            ushort startIndex = BitConverter.ToUInt16(buffer, offset);
+            ushort startId = BitConverter.ToUInt16(buffer, offset + 2);
+            ushort endIndex = BitConverter.ToUInt16(buffer, offset + 4);
+            ushort endId = BitConverter.ToUInt16(buffer, offset + 6);
+
+            // Console.WriteLine($"🔧 Config : Index {startIndex}-{endIndex} → Entités {startId}-{endId}");
+
+            for (ushort index = startIndex, id = startId;
+                 index <= endIndex && id <= endId;
+                 index++, id++)
+            {
+                _indexToEntityId[index] = id;
+            }
+
+            offset += 8;
+        }
+
+        Console.WriteLine($"📌 {_indexToEntityId.Count} index configurés.");
+    }
+
 
     private async Task ProcessUpdateMessage(byte[] buffer)
     {
@@ -142,4 +174,10 @@ public class EHubReceiver : IDisposable
         gzip.CopyTo(output);
         return output.ToArray();
     }
+
+    public Dictionary<ushort, ushort> GetIndexToEntityMapping()
+    {
+        return new Dictionary<ushort, ushort>(_indexToEntityId);
+    }
+
 }
