@@ -73,6 +73,7 @@ public class Router
                     // Envoie les trames DMX actives via ArtNet
                     foreach (var frame in _mapper.GetActiveFrames())
                     {
+                        LogDmxFrameToFile(frame); // ← Ajout du log
                         await _sender.SendDmxFrameAsync(frame);
                     }
 
@@ -109,4 +110,37 @@ public class Router
     {
         _mapper.UpdateEntities(updated);
     }
+
+    private void LogDmxFrameToFile(DmxFrame frame)
+    {
+        string folder = "Logs";
+        string file = Path.Combine(folder, "dmx_log.txt");
+
+        try
+        {
+            Directory.CreateDirectory(folder); // Crée le dossier Logs s'il n'existe pas
+
+            using StreamWriter sw = new StreamWriter(file, append: true);
+
+            // En-tête : date + cible
+            sw.WriteLine($"[DMX] {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - Univers {frame.Universe} - IP: {frame.TargetIP}");
+
+            // Log des canaux actifs uniquement
+            for (int i = 1; i <= DmxFrame.DMX_CHANNELS; i++)
+            {
+                byte value = frame.GetChannel(i);
+                if (value > 0)
+                {
+                    sw.WriteLine($"  Canal {i} : {value}");
+                }
+            }
+
+            sw.WriteLine(); // Ligne vide pour séparer les trames
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du log DMX : {ex.Message}");
+        }
+    }
+
 }
