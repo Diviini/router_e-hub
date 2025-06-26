@@ -12,6 +12,7 @@ public class Router
     private readonly EHubReceiver _receiver;
     private readonly ArtNetSender _sender;
     private readonly DmxMapper _mapper;
+    int MaxFps = 40;
 
     private readonly CancellationTokenSource _cancellation = new();
     private Task? _routingLoop;
@@ -66,20 +67,21 @@ public class Router
             {
                 try
                 {
-                    // Met à jour les trames DMX à partir des entités reçues
+                    // Mettre à jour les entités (update)
                     var entities = _receiver.GetCurrentEntities();
                     _mapper.UpdateEntities(entities);
 
+                    // Récupérer toutes les trames avec données
                     var frames = _mapper.GetActiveFrames();
-                    
-                 
+
                     foreach (var frame in frames)
                     {
-                        LogDmxFrameToFile(frame); // ← Ajout du log
-                        await _sender.SendDmxFrameAsync(frame);
+                        LogDmxFrameToFile(frame);
+                        await _sender.SendDmxFrameAsync(frame); // plusieurs envois par "tick"
                     }
 
-                    await Task.Delay(25, _cancellation.Token); // 40 FPS max
+                    // Attendre 25ms avant d’envoyer la prochaine série
+                    await Task.Delay(25, _cancellation.Token); // cadence fixe : 40FPS
                 }
                 catch (TaskCanceledException) { break; }
                 catch (Exception ex)
@@ -88,6 +90,7 @@ public class Router
                 }
             }
         });
+
 
         Console.WriteLine("Boucle de routage en cours...");
     }
