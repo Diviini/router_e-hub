@@ -21,7 +21,7 @@ class Program
         var router = new Router(receiver, sender);
 
         // Configuration d'exemple pour l'écran LED
-        CsvMappingLoader.Load("EmitterHub/Config/mapping.csv", router);
+        CsvMappingLoader.Load("EmitterHub/Config/mapping_clean.csv", router);
 
         // Démarrage du routage
         await router.StartAsync();
