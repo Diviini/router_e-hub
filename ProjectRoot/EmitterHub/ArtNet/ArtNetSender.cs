@@ -12,6 +12,8 @@ public class ArtNetSender : IDisposable
     private readonly UdpClient _udpClient;
     private readonly Dictionary<string, IPEndPoint> _endpoints;
     private readonly object _lockObject = new object();
+    private readonly Dictionary<string, byte[]> _lastFrames = new();
+
 
     // Contrôle de débit
     private DateTime _lastSendTime = DateTime.MinValue;
@@ -41,7 +43,18 @@ public class ArtNetSender : IDisposable
             if ((now - _lastSendTime) < _minSendInterval)
                 return;
             _lastSendTime = now;
+
         }
+
+        if (_lastFrames.TryGetValue(frame.TargetIP, out var last))
+        {
+            if (last.SequenceEqual(frame.Channels))
+            {
+                return; // skip identical frame
+            }
+        }
+        _lastFrames[frame.TargetIP] = (byte[])frame.Channels.Clone(); // Save copy
+
 
         var packet = new ArtNetPacket(frame);
 
