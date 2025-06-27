@@ -58,6 +58,8 @@ public class Router
     /// </summary>
     public async Task StartAsync()
     {
+        var loopStart = DateTime.Now;
+
         Console.WriteLine("Démarrage du router...");
         await _receiver.StartAsync();
 
@@ -74,14 +76,18 @@ public class Router
                     // Récupérer toutes les trames avec données
                     var frames = _mapper.GetActiveFrames();
 
-                    foreach (var frame in frames)
+                    var sendTasks = frames.Select(frame =>
                     {
                         LogDmxFrameToFile(frame);
-                        await _sender.SendDmxFrameAsync(frame); // plusieurs envois par "tick"
-                    }
+                        return _sender.SendDmxFrameAsync(frame);
+                    });
+                    await Task.WhenAll(sendTasks);
+
 
                     // Attendre 25ms avant d’envoyer la prochaine série
-                    await Task.Delay(25, _cancellation.Token); // cadence fixe : 40FPS
+                    var elapsed = DateTime.Now - loopStart;
+                    int remainingMs = Math.Max(0, 25 - (int)elapsed.TotalMilliseconds);
+                    await Task.Delay(remainingMs, _cancellation.Token);
                 }
                 catch (TaskCanceledException) { break; }
                 catch (Exception ex)
