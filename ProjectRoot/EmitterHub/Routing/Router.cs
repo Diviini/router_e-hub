@@ -69,24 +69,32 @@ public class Router
             {
                 try
                 {
-                    // Mettre à jour les entités (update)
+                    var loopStart = DateTime.UtcNow;
+
+                    // Mise à jour des entités
                     var entities = _receiver.GetCurrentEntities();
                     _mapper.UpdateEntities(entities);
 
-                    // Récupérer toutes les trames avec données
+                    // Récupération des frames actives
                     var frames = _mapper.GetActiveFrames();
 
-                    var sendTasks = frames.Select(frame =>
+                    var sendTasks = new List<Task>();
+
+                    foreach (var frame in frames)
                     {
-                        LogDmxFrameToFile(frame);
-                        return _sender.SendDmxFrameAsync(frame);
-                    });
+                        if (frame.HasChangedSinceLastSend())
+                        {
+                            // LogDmxFrameToFile(frame);
+                            sendTasks.Add(_sender.SendDmxFrameAsync(frame));
+                            frame.MarkAsSent(); // Marquer comme envoyée
+                        }
+                    }
+
                     await Task.WhenAll(sendTasks);
 
-
-                    // Attendre 25ms avant d’envoyer la prochaine série
-                    var elapsed = DateTime.Now - loopStart;
-                    int remainingMs = Math.Max(0, 25 - (int)elapsed.TotalMilliseconds);
+                    // Framerate limité (ex. : 40 FPS → 25 ms/frame)
+                    var elapsed = DateTime.UtcNow - loopStart;
+                    int remainingMs = Math.Max(0, 1000 / MaxFps - (int)elapsed.TotalMilliseconds);
                     await Task.Delay(remainingMs, _cancellation.Token);
                 }
                 catch (TaskCanceledException) { break; }
@@ -96,6 +104,7 @@ public class Router
                 }
             }
         });
+
 
 
         Console.WriteLine("Boucle de routage en cours...");
