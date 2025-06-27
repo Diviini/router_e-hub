@@ -8,6 +8,7 @@ public class DmxFrame
     public const int DMX_CHANNELS = 512;
 
     private readonly byte[] _channels;
+    private readonly byte[] _lastSent = new byte[DMX_CHANNELS]; // 🔄 Mémoire de la dernière trame envoyée
 
     public byte[] Channels => _channels;
     public int Universe { get; set; }
@@ -19,9 +20,6 @@ public class DmxFrame
         Universe = universe;
     }
 
-    /// <summary>
-    /// Définit la valeur d'un canal (1-512)
-    /// </summary>
     public void SetChannel(int channel, byte value)
     {
         if (channel >= 1 && channel <= DMX_CHANNELS)
@@ -30,9 +28,6 @@ public class DmxFrame
         }
     }
 
-    /// <summary>
-    /// Obtient la valeur d'un canal (1-512)
-    /// </summary>
     public byte GetChannel(int channel)
     {
         if (channel >= 1 && channel <= DMX_CHANNELS)
@@ -42,9 +37,6 @@ public class DmxFrame
         return 0;
     }
 
-    /// <summary>
-    /// Définit une couleur RGB sur 3 canaux consécutifs
-    /// </summary>
     public void SetRGB(int startChannel, byte r, byte g, byte b)
     {
         SetChannel(startChannel, r);
@@ -52,9 +44,6 @@ public class DmxFrame
         SetChannel(startChannel + 2, b);
     }
 
-    /// <summary>
-    /// Définit une couleur RGBW sur 4 canaux consécutifs
-    /// </summary>
     public void SetRGBW(int startChannel, byte r, byte g, byte b, byte w)
     {
         SetChannel(startChannel, r);
@@ -63,25 +52,16 @@ public class DmxFrame
         SetChannel(startChannel + 3, w);
     }
 
-    /// <summary>
-    /// Remet tous les canaux à zéro
-    /// </summary>
     public void Clear()
     {
         Array.Clear(_channels, 0, DMX_CHANNELS);
     }
 
-    /// <summary>
-    /// Vérifie si la trame contient des données (au moins un canal non-zéro)
-    /// </summary>
     public bool HasData()
     {
         return _channels.Any(c => c > 0);
     }
 
-    /// <summary>
-    /// Copie les données vers un autre DmxFrame
-    /// </summary>
     public void CopyTo(DmxFrame destination)
     {
         Array.Copy(_channels, destination._channels, DMX_CHANNELS);
@@ -93,5 +73,21 @@ public class DmxFrame
     {
         int activeChannels = _channels.Count(c => c > 0);
         return $"DMX Universe {Universe} -> {TargetIP} ({activeChannels} active channels)";
+    }
+
+    // 🔄 Ajoutés :
+    public bool HasChangedSinceLastSend()
+    {
+        for (int i = 0; i < DMX_CHANNELS; i++)
+        {
+            if (_channels[i] != _lastSent[i])
+                return true;
+        }
+        return false;
+    }
+
+    public void MarkAsSent()
+    {
+        Array.Copy(_channels, _lastSent, DMX_CHANNELS);
     }
 }
