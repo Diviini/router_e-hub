@@ -12,6 +12,8 @@ public class Router
     private readonly EHubReceiver _receiver;
     private readonly ArtNetSender _sender;
     private readonly DmxMapper _mapper;
+    private readonly SemaphoreSlim _udpLimiter = new(8); // Max 8 envois simultanés
+
     int MaxFps = 40;
 
     private readonly CancellationTokenSource _cancellation = new();
@@ -77,17 +79,10 @@ public class Router
 
                     // Récupération des frames actives
                     var frames = _mapper.GetActiveFrames();
-
                     var sendTasks = new List<Task>();
-
                     foreach (var frame in frames)
                     {
-                        if (frame.HasChangedSinceLastSend())
-                        {
-                            // LogDmxFrameToFile(frame);
-                            sendTasks.Add(_sender.SendDmxFrameAsync(frame));
-                            frame.MarkAsSent(); // Marquer comme envoyée
-                        }
+                        sendTasks.Add(SendFrameWithLimitAsync(frame));
                     }
 
                     await Task.WhenAll(sendTasks);
@@ -109,6 +104,22 @@ public class Router
 
         Console.WriteLine("Boucle de routage en cours...");
     }
+
+    private async Task SendFrameWithLimitAsync(DmxFrame frame)
+    {
+        await _udpLimiter.WaitAsync();
+
+        try
+        {
+            // LogDmxFrameToFile(frame);
+            await _sender.SendDmxFrameAsync(frame);
+        }
+        finally
+        {
+            _udpLimiter.Release();
+        }
+    }
+
 
     /// <summary>
     /// Arrête proprement le routeur

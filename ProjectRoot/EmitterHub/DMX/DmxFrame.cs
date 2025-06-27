@@ -8,7 +8,6 @@ public class DmxFrame
     public const int DMX_CHANNELS = 512;
 
     private readonly byte[] _channels;
-    private readonly byte[] _lastSent = new byte[DMX_CHANNELS]; // 🔄 Mémoire de la dernière trame envoyée
 
     public byte[] Channels => _channels;
     public int Universe { get; set; }
@@ -73,21 +72,5 @@ public class DmxFrame
     {
         int activeChannels = _channels.Count(c => c > 0);
         return $"DMX Universe {Universe} -> {TargetIP} ({activeChannels} active channels)";
-    }
-
-    // 🔄 Ajoutés :
-    public bool HasChangedSinceLastSend()
-    {
-        for (int i = 0; i < DMX_CHANNELS; i++)
-        {
-            if (_channels[i] != _lastSent[i])
-                return true;
-        }
-        return false;
-    }
-
-    public void MarkAsSent()
-    {
-        Array.Copy(_channels, _lastSent, DMX_CHANNELS);
     }
 }
