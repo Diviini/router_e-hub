@@ -78,12 +78,6 @@ public class DmxMapper
     /// </summary>
     public void UpdateEntities(Dictionary<ushort, EntityState> entities)
     {
-        // Effacer toutes les trames
-        foreach (var frame in _frames.Values)
-        {
-            frame.Clear();
-        }
-
         // Mapper chaque entité
         foreach (var entity in entities.Values)
         {
@@ -99,11 +93,11 @@ public class DmxMapper
     }
 
     /// <summary>
-    /// Obtient toutes les trames DMX qui contiennent des données
+    /// Obtient toutes les trames DMX qui ont été modifiées depuis leur dernier envoi.
     /// </summary>
-    public IEnumerable<DmxFrame> GetActiveFrames()
+    public IEnumerable<DmxFrame> GetModifiedFrames()
     {
-        return _frames.Values.Where(f => f.HasData());
+        return _frames.Values.Where(f => f.IsModified);
     }
 
     /// <summary>

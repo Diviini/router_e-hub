@@ -28,7 +28,12 @@ public class ArtNetSender : IDisposable
     /// </summary>
     public async Task SendDmxFrameAsync(DmxFrame frame)
     {
-        if (frame == null || !frame.HasData()) return;
+        if (frame == null || !frame.IsModified) return;
+
+        // If the frame is marked as modified, we send it.
+        // This covers cases where it becomes active, changes data, or becomes inactive.
+        // DmxFrame.HasData() is still useful if one wants to know if it *currently* has active channels,
+        // but IsModified is the trigger for sending.
 
         var packet = new ArtNetPacket(frame);
 
@@ -40,6 +45,7 @@ public class ArtNetSender : IDisposable
 
         await _udpClient.SendAsync(packet.PacketData, packet.PacketSize, endpoint);
         PacketsSent++;
+        frame.MarkAsSent(); // Reset the IsModified flag after sending
     }
 
     public void Dispose()

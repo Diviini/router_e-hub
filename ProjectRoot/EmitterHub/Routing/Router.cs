@@ -70,15 +70,11 @@ public class Router
             while (!_cancellation.Token.IsCancellationRequested)
             {
                 try
-                {
+                { // The DMX data update in the mapper is now handled by OnEntitiesUpdated
                     var loopStart = DateTime.UtcNow;
 
-                    // Mise à jour des entités
-                    var entities = _receiver.GetCurrentEntities();
-                    _mapper.UpdateEntities(entities);
-
                     // Récupération des frames actives
-                    var frames = _mapper.GetActiveFrames();
+                    var frames = _mapper.GetModifiedFrames(); // Correctly using GetModifiedFrames
                     var sendTasks = new List<Task>();
                     foreach (var frame in frames)
                     {

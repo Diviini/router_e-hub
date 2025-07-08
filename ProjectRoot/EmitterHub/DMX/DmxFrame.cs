@@ -8,6 +8,8 @@ public class DmxFrame
     public const int DMX_CHANNELS = 512;
 
     private readonly byte[] _channels;
+    private int _activeChannelsCount = 0;
+    public bool IsModified { get; private set; } = false;
 
     public byte[] Channels => _channels;
     public int Universe { get; set; }
@@ -23,7 +25,23 @@ public class DmxFrame
     {
         if (channel >= 1 && channel <= DMX_CHANNELS)
         {
-            _channels[channel - 1] = value;
+            int index = channel - 1;
+            if (_channels[index] == value) return; // Value hasn't changed
+
+            bool wasActive = _channels[index] > 0;
+            bool isActive = value > 0;
+
+            _channels[index] = value;
+            IsModified = true;
+
+            if (wasActive && !isActive)
+            {
+                _activeChannelsCount--;
+            }
+            else if (!wasActive && isActive)
+            {
+                _activeChannelsCount++;
+            }
         }
     }
 
@@ -53,12 +71,20 @@ public class DmxFrame
 
     public void Clear()
     {
+        bool needsModificationMark = _activeChannelsCount > 0;
         Array.Clear(_channels, 0, DMX_CHANNELS);
+        _activeChannelsCount = 0;
+        if (needsModificationMark)
+        {
+            IsModified = true;
+        }
     }
 
-    public bool HasData()
+    public bool HasData() => _activeChannelsCount > 0;
+
+    public void MarkAsSent()
     {
-        return _channels.Any(c => c > 0);
+        IsModified = false;
     }
 
     public void CopyTo(DmxFrame destination)
