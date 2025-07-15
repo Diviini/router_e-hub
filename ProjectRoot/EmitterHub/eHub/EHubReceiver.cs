@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
@@ -14,7 +15,6 @@ public class EHubReceiver : IDisposable
     private readonly CancellationTokenSource _cancellationTokenSource;
     private readonly Dictionary<ushort, EntityState> _entities;
     private readonly Dictionary<ushort, ushort> _indexToEntityId = new();
-
 
     public event Action<Dictionary<ushort, EntityState>>? EntitiesUpdated;
 
@@ -34,7 +34,7 @@ public class EHubReceiver : IDisposable
     /// <summary>
     /// Démarre la boucle d’écoute asynchrone
     /// </summary>
-    public async Task StartAsync()
+    public Task StartAsync()
     {
         _ = Task.Run(async () =>
         {
@@ -43,7 +43,8 @@ public class EHubReceiver : IDisposable
                 try
                 {
                     var result = await _udpClient.ReceiveAsync();
-                    await ProcessMessage(result.Buffer);
+                    // On ne bloque pas la boucle de réception, on traite le message en arrière plan
+                    _ = Task.Run(() => ProcessMessage(result.Buffer), _cancellationTokenSource.Token);
                 }
                 catch (ObjectDisposedException) { break; }
                 catch (Exception ex)
@@ -52,6 +53,7 @@ public class EHubReceiver : IDisposable
                 }
             }
         });
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -71,7 +73,7 @@ public class EHubReceiver : IDisposable
         _cancellationTokenSource?.Dispose();
     }
 
-    private async Task ProcessMessage(byte[] buffer)
+    private void ProcessMessage(byte[] buffer)
     {
         if (buffer.Length < 6) return;
 
@@ -89,20 +91,20 @@ public class EHubReceiver : IDisposable
 
         if (type == 2)
         {
-            await ProcessUpdateMessage(buffer);
+            ProcessUpdateMessage(buffer);
         }
         else if (type == 1)
         {
-            await ProcessConfigMessage(buffer);
+            ProcessConfigMessage(buffer);
         }
     }
 
-    private async Task ProcessConfigMessage(byte[] buffer)
+    private void ProcessConfigMessage(byte[] buffer)
     {
         // Minimum = header eHuB (6) + 1 groupe (8) = 14 octets
         if (buffer.Length < 14) return;
 
-        int offset = 2; // On saute type (1 byte) et universe (1 byte)
+        int offset = 6; // On saute le header eHuB
 
         while (offset + 8 <= buffer.Length)
         {
@@ -110,8 +112,6 @@ public class EHubReceiver : IDisposable
             ushort startId = BitConverter.ToUInt16(buffer, offset + 2);
             ushort endIndex = BitConverter.ToUInt16(buffer, offset + 4);
             ushort endId = BitConverter.ToUInt16(buffer, offset + 6);
-
-            // Console.WriteLine($"🔧 Config : Index {startIndex}-{endIndex} → Entités {startId}-{endId}");
 
             for (ushort index = startIndex, id = startId;
                  index <= endIndex && id <= endId;
@@ -126,8 +126,7 @@ public class EHubReceiver : IDisposable
         Console.WriteLine($"📌 {_indexToEntityId.Count} index configurés.");
     }
 
-
-    private async Task ProcessUpdateMessage(byte[] buffer)
+    private void ProcessUpdateMessage(byte[] buffer)
     {
         if (buffer.Length < 10) return;
 
@@ -136,48 +135,55 @@ public class EHubReceiver : IDisposable
 
         if (buffer.Length < 10 + compressedSize) return;
 
-        byte[] compressed = new byte[compressedSize];
-        Array.Copy(buffer, 10, compressed, 0, compressedSize);
-
-        byte[] decompressed = Decompress(compressed);
-
-        var updated = new Dictionary<ushort, EntityState>();
-
-        // Console.WriteLine($"\n🟢 Update reçu : {entityCount} entités");
-
-        for (int i = 0; i < entityCount; i++)
+        var compressedSpan = new ReadOnlySpan<byte>(buffer, 10, compressedSize);
+        byte[]? decompressedBuffer = null;
+        try
         {
-            int offset = i * 6;
-            if (offset + 6 > decompressed.Length) break;
+            decompressedBuffer = Decompress(compressedSpan);
+            var updated = new Dictionary<ushort, EntityState>();
 
-            ushort id = BitConverter.ToUInt16(decompressed, offset);
-            byte r = decompressed[offset + 2];
-            byte g = decompressed[offset + 3];
-            byte b = decompressed[offset + 4];
-            byte w = decompressed[offset + 5];
+            for (int i = 0; i < entityCount; i++)
+            {
+                int offset = i * 6;
+                if (offset + 6 > decompressedBuffer.Length) break;
 
-            var entity = new EntityState(id, r, g, b, w);
-            _entities[id] = entity;
-            updated[id] = entity;
+                ushort id = BitConverter.ToUInt16(decompressedBuffer, offset);
+                byte r = decompressedBuffer[offset + 2];
+                byte g = decompressedBuffer[offset + 3];
+                byte b = decompressedBuffer[offset + 4];
+                byte w = decompressedBuffer[offset + 5];
 
-            // Console.WriteLine($"🔸 Entity {id:0000} : R={r} G={g} B={b} W={w}");
+                var entity = new EntityState(id, r, g, b, w);
+                _entities[id] = entity;
+                updated[id] = entity;
+            }
+
+            EntitiesUpdated?.Invoke(updated);
         }
-
-        EntitiesUpdated?.Invoke(updated);
+        finally
+        {
+            if (decompressedBuffer != null)
+            {
+                ArrayPool<byte>.Shared.Return(decompressedBuffer);
+            }
+        }
     }
 
-    private byte[] Decompress(byte[] compressed)
+    private byte[] Decompress(ReadOnlySpan<byte> compressed)
     {
-        using var input = new MemoryStream(compressed);
-        using var gzip = new GZipStream(input, CompressionMode.Decompress);
-        using var output = new MemoryStream();
-        gzip.CopyTo(output);
-        return output.ToArray();
+        // On loue un buffer pour la décompression pour éviter les allocations
+        byte[] decompressed = ArrayPool<byte>.Shared.Rent(compressed.Length * 5); // Estimation
+        int bytesWritten;
+        using (var input = new MemoryStream(compressed.ToArray()))
+        using (var zlib = new ZLibStream(input, CompressionMode.Decompress))
+        {
+            bytesWritten = zlib.Read(decompressed, 0, decompressed.Length);
+        }
+        return decompressed;
     }
 
     public Dictionary<ushort, ushort> GetIndexToEntityMapping()
     {
         return new Dictionary<ushort, ushort>(_indexToEntityId);
     }
-
 }

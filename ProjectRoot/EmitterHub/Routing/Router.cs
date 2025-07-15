@@ -12,9 +12,7 @@ public class Router
     private readonly EHubReceiver _receiver;
     private readonly ArtNetSender _sender;
     private readonly DmxMapper _mapper;
-    private readonly SemaphoreSlim _udpLimiter = new(8); // Max 8 envois simultanés
-
-    int MaxFps = 40;
+    private readonly int _maxFps = 40;
 
     private readonly CancellationTokenSource _cancellation = new();
     private Task? _routingLoop;
@@ -28,12 +26,6 @@ public class Router
         _receiver.EntitiesUpdated += OnEntitiesUpdated;
     }
 
-    /// <summary>
-    /// Ajoute une plage d'entités à router
-    /// </summary>
-    /// <summary>
-    /// Ajoute une plage d'entités avec mode DMX personnalisé et canal de départ
-    /// </summary>
     public void AddEntityRange(
         ushort entityStart,
         ushort entityEnd,
@@ -54,72 +46,43 @@ public class Router
         );
     }
 
-
-    /// <summary>
-    /// Démarre l'écoute et le routage en tâche de fond
-    /// </summary>
     public async Task StartAsync()
     {
-        var loopStart = DateTime.Now;
-
         Console.WriteLine("Démarrage du router...");
         await _receiver.StartAsync();
 
-        _routingLoop = Task.Run(async () =>
-        {
-            while (!_cancellation.Token.IsCancellationRequested)
-            {
-                try
-                { // The DMX data update in the mapper is now handled by OnEntitiesUpdated
-                    var loopStart = DateTime.UtcNow;
-
-                    // Récupération des frames actives
-                    var frames = _mapper.GetModifiedFrames(); // Correctly using GetModifiedFrames
-                    var sendTasks = new List<Task>();
-                    foreach (var frame in frames)
-                    {
-                        sendTasks.Add(SendFrameWithLimitAsync(frame));
-                    }
-
-                    await Task.WhenAll(sendTasks);
-
-                    // Framerate limité (ex. : 40 FPS → 25 ms/frame)
-                    var elapsed = DateTime.UtcNow - loopStart;
-                    int remainingMs = Math.Max(0, 1000 / MaxFps - (int)elapsed.TotalMilliseconds);
-                    await Task.Delay(remainingMs, _cancellation.Token);
-                }
-                catch (TaskCanceledException) { break; }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Erreur dans la boucle de routage : {ex.Message}");
-                }
-            }
-        });
-
-
+        _routingLoop = Task.Run(RoutingLoop, _cancellation.Token);
 
         Console.WriteLine("Boucle de routage en cours...");
     }
 
-    private async Task SendFrameWithLimitAsync(DmxFrame frame)
+    private async Task RoutingLoop()
     {
-        await _udpLimiter.WaitAsync();
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1.0 / _maxFps));
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 8, // Limite le nombre d'envois simultanés
+            CancellationToken = _cancellation.Token
+        };
 
-        try
+        while (await timer.WaitForNextTickAsync(_cancellation.Token))
         {
-            // LogDmxFrameToFile(frame);
-            await _sender.SendDmxFrameAsync(frame);
-        }
-        finally
-        {
-            _udpLimiter.Release();
+            try
+            {
+                var frames = _mapper.GetModifiedFrames();
+                await Parallel.ForEachAsync(frames, parallelOptions, async (frame, token) =>
+                {
+                    await _sender.SendDmxFrameAsync(frame);
+                });
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur dans la boucle de routage : {ex.Message}");
+            }
         }
     }
 
-
-    /// <summary>
-    /// Arrête proprement le routeur
-    /// </summary>
     public async Task StopAsync()
     {
         Console.WriteLine("Arrêt du router...");
@@ -130,44 +93,8 @@ public class Router
             await _routingLoop;
     }
 
-    /// <summary>
-    /// Callback interne lors d'une mise à jour eHuB
-    /// </summary>
     private void OnEntitiesUpdated(Dictionary<ushort, EntityState> updated)
     {
         _mapper.UpdateEntities(updated);
     }
-
-    private void LogDmxFrameToFile(DmxFrame frame)
-    {
-        string folder = "Logs";
-        string file = Path.Combine(folder, "dmx_log.txt");
-
-        try
-        {
-            Directory.CreateDirectory(folder); // Crée le dossier Logs s'il n'existe pas
-
-            using StreamWriter sw = new StreamWriter(file, append: true);
-
-            // En-tête : date + cible
-            sw.WriteLine($"[DMX] {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - Univers {frame.Universe} - IP: {frame.TargetIP}");
-
-            // Log des canaux actifs uniquement
-            for (int i = 1; i <= DmxFrame.DMX_CHANNELS; i++)
-            {
-                byte value = frame.GetChannel(i);
-                if (value > 0)
-                {
-                    sw.WriteLine($"  Canal {i} : {value}");
-                }
-            }
-
-            sw.WriteLine(); // Ligne vide pour séparer les trames
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erreur lors du log DMX : {ex.Message}");
-        }
-    }
-
 }

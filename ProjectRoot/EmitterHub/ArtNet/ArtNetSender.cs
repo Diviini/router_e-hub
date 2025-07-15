@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using EmitterHub.DMX;
@@ -10,7 +11,7 @@ namespace EmitterHub.ArtNet;
 public class ArtNetSender : IDisposable
 {
     private readonly UdpClient _udpClient;
-    private readonly Dictionary<string, IPEndPoint> _endpoints;
+    private readonly ConcurrentDictionary<string, IPEndPoint> _endpoints;
 
     public int PacketsSent { get; private set; }
     public int MaxFrameRate { get; set; } = 40; // FPS maximum
@@ -18,7 +19,7 @@ public class ArtNetSender : IDisposable
     public ArtNetSender()
     {
         _udpClient = new UdpClient();
-        _endpoints = new Dictionary<string, IPEndPoint>();
+        _endpoints = new ConcurrentDictionary<string, IPEndPoint>();
 
         Console.WriteLine($"ArtNet Sender initialisé (max {MaxFrameRate} FPS)");
     }
@@ -30,18 +31,10 @@ public class ArtNetSender : IDisposable
     {
         if (frame == null || !frame.IsModified) return;
 
-        // If the frame is marked as modified, we send it.
-        // This covers cases where it becomes active, changes data, or becomes inactive.
-        // DmxFrame.HasData() is still useful if one wants to know if it *currently* has active channels,
-        // but IsModified is the trigger for sending.
-
         var packet = new ArtNetPacket(frame);
 
-        if (!_endpoints.TryGetValue(frame.TargetIP, out var endpoint))
-        {
-            endpoint = new IPEndPoint(IPAddress.Parse(frame.TargetIP), ArtNetPacket.ARTNET_PORT);
-            _endpoints[frame.TargetIP] = endpoint;
-        }
+        var endpoint = _endpoints.GetOrAdd(frame.TargetIP, 
+            ip => new IPEndPoint(IPAddress.Parse(ip), ArtNetPacket.ARTNET_PORT));
 
         await _udpClient.SendAsync(packet.PacketData, packet.PacketSize, endpoint);
         PacketsSent++;

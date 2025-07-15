@@ -1,7 +1,6 @@
 using System;
 using System.IO;
-using System.Globalization;
-using System.Collections.Generic;
+using System.Linq;
 using EmitterHub.Routing;
 
 namespace EmitterHub.eHub
@@ -18,23 +17,19 @@ namespace EmitterHub.eHub
 
             Console.WriteLine($"📥 Chargement du mapping depuis : {path}");
 
-            var lines = File.ReadAllLines(path);
-            if (lines.Length <= 1)
-            {
-                Console.WriteLine("❌ Fichier CSV vide ou uniquement l'en-tête.");
-                return;
-            }
+            var lines = File.ReadLines(path).Skip(1); // On saute l'en-tête
+            int lineCount = 1;
 
-            for (int i = 1; i < lines.Length; i++)
+            foreach (var line in lines)
             {
-                var line = lines[i];
+                lineCount++;
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
                 var cols = line.Split(';');
 
                 if (cols.Length < 7)
                 {
-                    Console.WriteLine($"⚠️ Ligne {i + 1} ignorée (colonnes insuffisantes)");
+                    Console.WriteLine($"⚠️ Ligne {lineCount} ignorée (colonnes insuffisantes)");
                     continue;
                 }
 
@@ -48,7 +43,6 @@ namespace EmitterHub.eHub
                     string channelMode = cols[5].Trim().ToUpper();
                     ushort dmxStartChannel = ushort.Parse(cols[6]);
 
-                    // Ajout au routeur
                     router.AddEntityRange(
                         entityStart,
                         entityEnd,
@@ -59,11 +53,11 @@ namespace EmitterHub.eHub
                         dmxStartChannel
                     );
 
-                    Console.WriteLine($"✅ Ligne {i + 1} : {entityStart}-{entityEnd} → {ip} [U{universeStart}-{universeEnd}]");
+                    Console.WriteLine($"✅ Ligne {lineCount} : {entityStart}-{entityEnd} → {ip} [U{universeStart}-{universeEnd}]");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ Erreur ligne {i + 1} : {ex.Message}");
+                    Console.WriteLine($"❌ Erreur ligne {lineCount} : {ex.Message}");
                 }
             }
 
