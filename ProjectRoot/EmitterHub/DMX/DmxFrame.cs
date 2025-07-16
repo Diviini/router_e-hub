@@ -72,14 +72,6 @@ public class DmxFrame
     }
 
     /// <summary>
-    /// Vérifie si la trame contient des données (au moins un canal non-zéro)
-    /// </summary>
-    public bool HasData()
-    {
-        return _channels.Any(c => c > 0);
-    }
-
-    /// <summary>
     /// Copie les données vers un autre DmxFrame
     /// </summary>
     public void CopyTo(DmxFrame destination)
