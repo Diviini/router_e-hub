@@ -1,22 +1,14 @@
-using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 
 namespace EmitterHub.eHub;
 
-/// <summary>
-/// Récepteur eHuB pour univers unique : écoute, affiche, retourne les entités
-/// </summary>
-public class EHubReceiver : IDisposable
+public class EHubReceiver
 {
     private readonly UdpClient _udpClient;
     private readonly int _targetUniverse;
-    private readonly CancellationTokenSource _cancellationTokenSource;
-    private readonly Dictionary<ushort, EntityState> _entities;
+    private readonly Dictionary<ushort, EntityState> _entities = new();
     private readonly Dictionary<ushort, ushort> _indexToEntityId = new();
-
-
-    public event Action<Dictionary<ushort, EntityState>>? EntitiesUpdated;
 
     public int MessagesReceived { get; private set; }
     public int ActiveEntities => _entities.Count;
@@ -25,125 +17,86 @@ public class EHubReceiver : IDisposable
     {
         _udpClient = new UdpClient(port);
         _targetUniverse = targetUniverse;
-        _cancellationTokenSource = new CancellationTokenSource();
-        _entities = new Dictionary<ushort, EntityState>();
-
         Console.WriteLine($"🎧 eHuBReceiver en écoute sur port {port}, univers {targetUniverse}");
     }
 
-    /// <summary>
-    /// Démarre la boucle d’écoute asynchrone
-    /// </summary>
-    public async Task StartAsync()
+    public bool TryReceiveOnce()
     {
-        _ = Task.Run(async () =>
+        if (_udpClient.Available > 0)
         {
-            while (!_cancellationTokenSource.Token.IsCancellationRequested)
-            {
-                try
-                {
-                    var result = await _udpClient.ReceiveAsync();
-                    await ProcessMessage(result.Buffer);
-                }
-                catch (ObjectDisposedException) { break; }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Erreur eHuB : {ex.Message}");
-                }
-            }
-        });
+            IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+            byte[] buffer = _udpClient.Receive(ref remoteEP);
+            ProcessMessage(buffer);
+            return true;
+        }
+        return false;
     }
 
-    /// <summary>
-    /// Retourne toutes les entités actuellement en mémoire
-    /// </summary>
     public Dictionary<ushort, EntityState> GetCurrentEntities()
     {
-        return new Dictionary<ushort, EntityState>(_entities);
+        lock (_entities)
+        {
+            return new Dictionary<ushort, EntityState>(_entities);
+        }
     }
 
-    public void Stop() => _cancellationTokenSource.Cancel();
-
-    public void Dispose()
+    public Dictionary<ushort, ushort> GetIndexToEntityMapping()
     {
-        Stop();
-        _udpClient?.Dispose();
-        _cancellationTokenSource?.Dispose();
+        lock (_indexToEntityId)
+        {
+            return new Dictionary<ushort, ushort>(_indexToEntityId);
+        }
     }
 
-    private async Task ProcessMessage(byte[] buffer)
+    private void ProcessMessage(byte[] buffer)
     {
         if (buffer.Length < 6) return;
-
-        // Vérifie l'entête eHuB
-        if (buffer[0] != 'e' || buffer[1] != 'H' || buffer[2] != 'u' || buffer[3] != 'B')
-            return;
+        if (buffer[0] != 'e' || buffer[1] != 'H' || buffer[2] != 'u' || buffer[3] != 'B') return;
 
         byte type = buffer[4];
         byte universe = buffer[5];
-
-        if (universe != _targetUniverse)
-            return;
+        if (universe != _targetUniverse) return;
 
         MessagesReceived++;
 
         if (type == 2)
-        {
-            await ProcessUpdateMessage(buffer);
-        }
+            ProcessUpdateMessage(buffer);
         else if (type == 1)
-        {
-            await ProcessConfigMessage(buffer);
-        }
+            ProcessConfigMessage(buffer);
     }
 
-    private async Task ProcessConfigMessage(byte[] buffer)
+    private void ProcessConfigMessage(byte[] buffer)
     {
-        // Minimum = header eHuB (6) + 1 groupe (8) = 14 octets
         if (buffer.Length < 14) return;
+        int offset = 2;
 
-        int offset = 2; // On saute type (1 byte) et universe (1 byte)
-
-        while (offset + 8 <= buffer.Length)
+        lock (_indexToEntityId)
         {
-            ushort startIndex = BitConverter.ToUInt16(buffer, offset);
-            ushort startId = BitConverter.ToUInt16(buffer, offset + 2);
-            ushort endIndex = BitConverter.ToUInt16(buffer, offset + 4);
-            ushort endId = BitConverter.ToUInt16(buffer, offset + 6);
-
-            // Console.WriteLine($"🔧 Config : Index {startIndex}-{endIndex} → Entités {startId}-{endId}");
-
-            for (ushort index = startIndex, id = startId;
-                 index <= endIndex && id <= endId;
-                 index++, id++)
+            while (offset + 8 <= buffer.Length)
             {
-                _indexToEntityId[index] = id;
+                ushort startIndex = BitConverter.ToUInt16(buffer, offset);
+                ushort startId = BitConverter.ToUInt16(buffer, offset + 2);
+                ushort endIndex = BitConverter.ToUInt16(buffer, offset + 4);
+                ushort endId = BitConverter.ToUInt16(buffer, offset + 6);
+
+                for (ushort index = startIndex, id = startId; index <= endIndex && id <= endId; index++, id++)
+                    _indexToEntityId[index] = id;
+
+                offset += 8;
             }
-
-            offset += 8;
         }
-
-        Console.WriteLine($"📌 {_indexToEntityId.Count} index configurés.");
     }
 
-
-    private async Task ProcessUpdateMessage(byte[] buffer)
+    private void ProcessUpdateMessage(byte[] buffer)
     {
         if (buffer.Length < 10) return;
-
         ushort entityCount = BitConverter.ToUInt16(buffer, 6);
         ushort compressedSize = BitConverter.ToUInt16(buffer, 8);
-
         if (buffer.Length < 10 + compressedSize) return;
 
         byte[] compressed = new byte[compressedSize];
         Array.Copy(buffer, 10, compressed, 0, compressedSize);
-
         byte[] decompressed = Decompress(compressed);
-
-        var updated = new Dictionary<ushort, EntityState>();
-
-        // Console.WriteLine($"\n🟢 Update reçu : {entityCount} entités");
 
         for (int i = 0; i < entityCount; i++)
         {
@@ -157,27 +110,19 @@ public class EHubReceiver : IDisposable
             byte w = decompressed[offset + 5];
 
             var entity = new EntityState(id, r, g, b, w);
-            _entities[id] = entity;
-            updated[id] = entity;
 
-            // Console.WriteLine($"🔸 Entity {id:0000} : R={r} G={g} B={b} W={w}");
+            // 🔍 Log de l'entité eHuB reçue
+            // Console.WriteLine($"[eHuB] Entity {id} -> R:{r} G:{g} B:{b} W:{w}");
+            lock (_entities) _entities[id] = entity;
         }
-
-        EntitiesUpdated?.Invoke(updated);
     }
 
     private byte[] Decompress(byte[] compressed)
     {
         using var input = new MemoryStream(compressed);
-        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        using var gzip = new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress);
         using var output = new MemoryStream();
         gzip.CopyTo(output);
         return output.ToArray();
     }
-
-    public Dictionary<ushort, ushort> GetIndexToEntityMapping()
-    {
-        return new Dictionary<ushort, ushort>(_indexToEntityId);
-    }
-
 }
