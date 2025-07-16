@@ -25,9 +25,6 @@ public class ArtNetSender : IDisposable
     /// </summary>
     public async Task SendDmxFrameAsync(DmxFrame frame)
     {
-        if (frame == null) return;
-        if (!SendAllFrames && !frame.HasData()) return;
-
         var packet = new ArtNetPacket(frame);
 
         if (!_endpoints.TryGetValue(frame.TargetIP, out var endpoint))
