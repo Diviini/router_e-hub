@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
 using EmitterHub.DMX;
-using System.Collections.Concurrent;
 
 namespace EmitterHub.ArtNet;
 
@@ -18,7 +17,7 @@ public class ArtNetSender : IDisposable
 
     // Configuration adaptative
     private readonly int _maxPacketsPerSecond = 120; // Limite pour WiFi
-    private readonly int _adaptiveDelay = 10; // Délai adaptatif en ms
+    private readonly int _adaptiveDelay = 25; // Délai adaptatif en ms
     private readonly Queue<DateTime> _sendTimes = new();
     private readonly object _sendTimesLock = new();
 
@@ -53,7 +52,7 @@ public class ArtNetSender : IDisposable
         Console.WriteLine($"📤 Tentative d’envoi vers {frame.TargetIP}, Universe {frame.Universe}");
 
         // Contrôle du taux d'envoi
-        if (!await CheckRateLimitAsync())
+        if (!CheckRateLimit())
         {
             PacketsDropped++;
             return;
@@ -109,7 +108,7 @@ public class ArtNetSender : IDisposable
     /// <summary>
     /// Contrôle du taux d'envoi pour éviter la surcharge
     /// </summary>
-    private async Task<bool> CheckRateLimitAsync()
+    private bool CheckRateLimit()
     {
         lock (_sendTimesLock)
         {

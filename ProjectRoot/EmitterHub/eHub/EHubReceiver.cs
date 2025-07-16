@@ -101,6 +101,7 @@ public class EHubReceiver : IDisposable
 
     private void ProcessConfigMessage(byte[] buffer)
     {
+        Console.WriteLine($"🔧 Configuration reçue ? Buffer size: {buffer.Length}");
         // Minimum = header eHuB (6) + 1 groupe (8) = 14 octets
         if (buffer.Length < 14) return;
 
