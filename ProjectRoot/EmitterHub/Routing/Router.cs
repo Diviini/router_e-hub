@@ -199,7 +199,7 @@ public class Router
             _lastSentFrames[frame.Universe] = CloneFrame(frame);
 
             // Log asynchrone
-            _ = Task.Run(() => LogDmxFrameToFileAsync(frame));
+            // _ = Task.Run(() => LogDmxFrameToFileAsync(frame));
         }
         finally
         {
@@ -379,6 +379,7 @@ public class Router
     /// </summary>
     private void OnEntitiesUpdated(Dictionary<ushort, EntityState> updated)
     {
+        Console.WriteLine($"🔁 Mise à jour eHuB : {updated.Count} entités");
         // Mise à jour non-bloquante
         _ = Task.Run(() => _mapper.UpdateEntities(updated));
     }
@@ -394,6 +395,7 @@ public class Router
 
         var tasks = new[] { _routingLoop, _syncLoop, _networkMonitorLoop }
             .Where(t => t != null)
+            .Cast<Task>()
             .ToArray();
 
         await Task.WhenAll(tasks);
