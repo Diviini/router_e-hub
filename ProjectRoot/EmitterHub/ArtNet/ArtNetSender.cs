@@ -50,7 +50,7 @@ public class ArtNetSender : IDisposable
     /// </summary>
     public async Task SendDmxFrameAsync(DmxFrame frame)
     {
-        if (frame == null || !frame.IsModified) return;
+        Console.WriteLine($"📤 Tentative d’envoi vers {frame.TargetIP}, Universe {frame.Universe}");
 
         // Contrôle du taux d'envoi
         if (!await CheckRateLimitAsync())
@@ -64,6 +64,7 @@ public class ArtNetSender : IDisposable
         {
             await Task.Delay(_adaptiveDelay * 2); // Délai doublé si congestion
         }
+
 
         try
         {

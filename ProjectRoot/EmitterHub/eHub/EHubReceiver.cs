@@ -128,6 +128,8 @@ public class EHubReceiver : IDisposable
 
     private void ProcessUpdateMessage(byte[] buffer)
     {
+        Console.WriteLine($"🟢 Update reçu ? Buffer size: {buffer.Length}, Expected min: 10");
+
         if (buffer.Length < 10) return;
 
         ushort entityCount = BitConverter.ToUInt16(buffer, 6);
@@ -157,6 +159,7 @@ public class EHubReceiver : IDisposable
                 _entities[id] = entity;
                 updated[id] = entity;
             }
+            Console.WriteLine($"🔁 {updated.Count} entités mises à jour");
 
             EntitiesUpdated?.Invoke(updated);
         }
