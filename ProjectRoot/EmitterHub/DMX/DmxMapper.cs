@@ -51,7 +51,6 @@ public class DmxMapper
 
         int totalEntities = entityEnd - entityStart + 1;
         int universesCount = universeEnd - universeStart + 1;
-        int entitiesPerUniverse = 170; // Maximum RGB LEDs per universe (512/3)
 
         ushort currentEntity = entityStart;
         ushort currentUniverse = universeStart;
