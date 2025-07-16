@@ -49,7 +49,7 @@ public class ArtNetSender : IDisposable
     /// </summary>
     public async Task SendDmxFrameAsync(DmxFrame frame)
     {
-        Console.WriteLine($"📤 Tentative d’envoi vers {frame.TargetIP}, Universe {frame.Universe}");
+        // Console.WriteLine($"📤 Tentative d’envoi vers {frame.TargetIP}, Universe {frame.Universe}");
 
         // Contrôle du taux d'envoi
         if (!CheckRateLimit())
