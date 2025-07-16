@@ -47,7 +47,7 @@ public class DmxMapper
     ushort universeEnd,
     string channelMode,
     ushort dmxStartChannel)
-{
+    {
 
         int totalEntities = entityEnd - entityStart + 1;
         int universesCount = universeEnd - universeStart + 1;
@@ -99,6 +99,12 @@ public class DmxMapper
     {
         return _frames.Values.Where(f => f.IsModified);
     }
+
+    public IEnumerable<DmxFrame> GetActiveFrames()
+    {
+        return _frames.Values.Where(f => f.HasData());
+    }
+
 
     /// <summary>
     /// Obtient toutes les trames DMX
