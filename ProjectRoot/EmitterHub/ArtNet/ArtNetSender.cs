@@ -13,14 +13,11 @@ public class ArtNetSender : IDisposable
     private readonly Dictionary<string, IPEndPoint> _endpoints;
 
     public int PacketsSent { get; private set; }
-    public int MaxFrameRate { get; set; } = 40; // FPS maximum
 
     public ArtNetSender()
     {
         _udpClient = new UdpClient();
         _endpoints = new Dictionary<string, IPEndPoint>();
-
-        Console.WriteLine($"ArtNet Sender initialisé (max {MaxFrameRate} FPS)");
     }
 
     /// <summary>
