@@ -79,7 +79,7 @@ public class Router
                     _mapper.UpdateEntities(entities);
 
                     // Récupérer toutes les trames avec données
-                    var frames = _mapper.GetActiveFrames();
+                    var frames = _mapper.GetAllFrames();
 
                     var sendTasks = frames.Select(frame =>
                     {
