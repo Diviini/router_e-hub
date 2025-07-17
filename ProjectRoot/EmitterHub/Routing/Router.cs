@@ -13,7 +13,7 @@ public class Router
     private readonly ArtNetSender _sender;
     private readonly DmxMapper _mapper;
 
-    private readonly CancellationTokenSource _cancellation = new();
+    private CancellationTokenSource? _cancellation;
     private Task? _routingLoop;
 
     // Variables pour le logging des statistiques
@@ -61,6 +61,13 @@ public class Router
     /// </summary>
     public async Task StartAsync()
     {
+        // Si déjà démarré, on ne réouvre pas
+        if (_routingLoop != null && !_routingLoop.IsCompleted)
+            return;
+
+        _cancellation = new CancellationTokenSource();
+        _receiver.EntitiesUpdated += OnEntitiesUpdated;
+
         Console.WriteLine("Démarrage du router...");
         await _receiver.StartAsync();
 
@@ -96,7 +103,7 @@ public class Router
                     {
                         _tickCount++;
                         Console.WriteLine($"[TICK {_tickCount}] eHuB Msgs: {_receiver.MessagesReceived} | Frames: {_framesSentThisSecond} | ArtNet sent: {_framesSentThisSecond} | Total: {_sender.PacketsSent}");
-                        
+
                         // Reset pour la prochaine seconde
                         _framesSentThisSecond = 0;
                         _lastLogTime = DateTime.Now;
@@ -125,6 +132,8 @@ public class Router
     {
         Console.WriteLine("Arrêt du router...");
         _cancellation.Cancel();
+        if (_cancellation != null)
+            _cancellation.Cancel();
         _receiver.Stop();
 
         if (_routingLoop != null)
@@ -169,5 +178,10 @@ public class Router
         {
             Console.WriteLine($"Erreur lors du log DMX : {ex.Message}");
         }
+    }
+
+    public MappingStats GetStats()
+    {
+        return _mapper.GetStats();
     }
 }

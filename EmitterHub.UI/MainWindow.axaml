@@ -1,0 +1,71 @@
+<Window
+    x:Class="EmitterHub.UI.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="clr-namespace:EmitterHub.UI.ViewModels"
+    Title="EmitterHub Dashboard"
+    Width="400"
+    Height="380"
+    x:DataType="vm:StatsViewModel">
+
+    <StackPanel Margin="20" Spacing="15">
+        <!--  Titre  -->
+        <TextBlock
+            HorizontalAlignment="Center"
+            FontSize="24"
+            Text="📊 Statistiques en temps réel" />
+
+        <!--  Grille des stats  -->
+        <Grid
+            ColumnDefinitions="2*,*"
+            RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+            RowSpacing="8">
+            <TextBlock Grid.Row="0" Text="Messages eHuB reçus :" />
+            <TextBlock
+                Grid.Row="0"
+                Grid.Column="1"
+                Text="{Binding MessagesReceived}" />
+
+            <TextBlock Grid.Row="1" Text="Entités actives :" />
+            <TextBlock
+                Grid.Row="1"
+                Grid.Column="1"
+                Text="{Binding ActiveEntities}" />
+
+            <TextBlock Grid.Row="2" Text="Paquets ArtNet envoyés :" />
+            <TextBlock
+                Grid.Row="2"
+                Grid.Column="1"
+                Text="{Binding PacketsSent}" />
+
+            <TextBlock Grid.Row="3" Text="Univers configurés :" />
+            <TextBlock
+                Grid.Row="3"
+                Grid.Column="1"
+                Text="{Binding TotalUniverses}" />
+
+            <TextBlock Grid.Row="4" Text="Mappings totaux :" />
+            <TextBlock
+                Grid.Row="4"
+                Grid.Column="1"
+                Text="{Binding TotalMappings}" />
+
+            <TextBlock Grid.Row="5" Text="Trames actives :" />
+            <TextBlock
+                Grid.Row="5"
+                Grid.Column="1"
+                Text="{Binding ActiveFrames}" />
+        </Grid>
+
+        <!--  Bouton d'arrêt  -->
+        <Button
+            Margin="0,20,0,0"
+            HorizontalAlignment="Center"
+            Command="{Binding StopRouterCommand}"
+            Content="❎ Arrêter le router" />
+
+        <Button Command="{Binding RestartRouterCommand}" Content="🔄 Redémarrer" />
+    </StackPanel>
+
+
+</Window>
