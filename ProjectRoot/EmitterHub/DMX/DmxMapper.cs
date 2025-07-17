@@ -40,35 +40,32 @@ public class DmxMapper
     /// Ajoute un mapping pour une plage d'entités
     /// </summary>
     public void AddEntityRangeMapping(
-        ushort entityStart,
-        ushort entityEnd,
-        string ip,
-        ushort universeStart,
-        ushort universeEnd,
-        string channelMode,
-        ushort dmxStartChannel)
-    {
+    ushort entityStart,
+    ushort entityEnd,
+    string ip,
+    ushort universeStart,
+    ushort universeEnd,
+    string channelMode,
+    ushort dmxStartChannel)
+{
+
         int totalEntities = entityEnd - entityStart + 1;
+        int universesCount = universeEnd - universeStart + 1;
+        int entitiesPerUniverse = 170; // Maximum RGB LEDs per universe (512/3)
+
         ushort currentEntity = entityStart;
         ushort currentUniverse = universeStart;
-        ushort currentChannel = dmxStartChannel;
-
-        int channelSize = channelMode switch
-        {
-            "RGB" => 3,
-            "RGBW" => 4,
-            _ => 1
-        };
+        ushort currentChannel = 1;
 
         for (int i = 0; i < totalEntities; i++)
         {
             AddEntityMapping(currentEntity, ip, currentUniverse, currentChannel);
 
             currentEntity++;
-            currentChannel += (ushort)channelSize;
+            currentChannel += 3; // RGB = 3 canaux
 
             // Passer à l'univers suivant si nécessaire
-            if (currentChannel + channelSize - 1 > 512)
+            if (currentChannel > 512 - 2) // Garder de la place pour les 3 canaux RGB
             {
                 currentUniverse++;
                 currentChannel = 1;
@@ -81,26 +78,32 @@ public class DmxMapper
     /// </summary>
     public void UpdateEntities(Dictionary<ushort, EntityState> entities)
     {
+        // Effacer toutes les trames
         foreach (var frame in _frames.Values)
+        {
             frame.Clear();
+        }
 
+        // Mapper chaque entité
         foreach (var entity in entities.Values)
         {
-            if (!_entityMappings.ContainsKey(entity.Id))
+            if (_entityMappings.TryGetValue(entity.Id, out var mapping))
             {
-                Console.WriteLine($"[DmxMapper] Aucune entité mappée pour {entity.Id}, ignorée.");
-                throw new Exception($"[DmxMapper] Aucun mapping pour l'entité {entity.Id}");
+                if (_frames.TryGetValue(mapping.Universe, out var frame))
+                {
+                    // Mapper RGB (3 canaux consécutifs)
+                    frame.SetRGB(mapping.DmxChannel, entity.R, entity.G, entity.B);
+                }
             }
-            var mapping = _entityMappings[entity.Id];
-
-            if (!_frames.ContainsKey(mapping.Universe))
-            {
-                Console.WriteLine($"[DmxMapper] Aucune trame pour l'univers {mapping.Universe}, création...");
-                throw new Exception($"[DmxMapper] Frame manquante pour l'univers {mapping.Universe}");
-            }
-
-            _frames[mapping.Universe].SetRGB(mapping.DmxChannel, entity.R, entity.G, entity.B);
         }
+    }
+
+    /// <summary>
+    /// Obtient toutes les trames DMX qui contiennent des données
+    /// </summary>
+    public IEnumerable<DmxFrame> GetActiveFrames()
+    {
+        return _frames.Values.Where(f => f.HasData());
     }
 
     /// <summary>
@@ -120,6 +123,7 @@ public class DmxMapper
         {
             TotalEntities = _entityMappings.Count,
             TotalUniverses = _frames.Count,
+            ActiveFrames = _frames.Values.Count(f => f.HasData())
         };
     }
 

@@ -6,47 +6,55 @@ namespace EmitterHub;
 
 class Program
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
-        Console.WriteLine("EmitterHub - LED Installation Router (Sync Mode)");
+        Console.WriteLine("EmitterHub - LED Installation Router");
+        Console.WriteLine("====================================");
 
-        int listenPort = 8765;
-        int eHubUniverse = 1;
+        // Configuration par défaut
+        int listenPort = 8765;  // Port ArtNet standard
+        int eHubUniverse = 1;   // Univers eHuB par défaut
 
+        // Initialisation des composants
         var receiver = new EHubReceiver(listenPort, eHubUniverse);
         var sender = new ArtNetSender();
         var router = new Router(receiver, sender);
 
+        // Configuration d'exemple pour l'écran LED
         CsvMappingLoader.Load("EmitterHub/Config/mapping_clean.csv", router);
 
-        Console.WriteLine("Boucle synchronisée démarrée. Appuyez sur 'q' pour quitter, 's' pour stats.");
+        // Démarrage du routage
+        await router.StartAsync();
 
+        // Boucle principale
+        Console.WriteLine("Routage démarré. Appuyez sur 'q' pour quitter.");
         while (true)
         {
-            var start = DateTime.Now;
-            router.Tick();
-            var elapsed = (DateTime.Now - start).TotalMilliseconds;
-            int delay = Math.Max(0, 25 - (int)elapsed);
-            Thread.Sleep(delay);
+            var key = Console.ReadKey(true);
+            if (key.KeyChar == 'q' || key.KeyChar == 'Q')
+                break;
 
-            if (Console.KeyAvailable)
+            if (key.KeyChar == 's')
             {
-                var key = Console.ReadKey(true);
-                if (key.KeyChar == 'q') break;
-                if (key.KeyChar == 's')
+                Console.WriteLine("\n--- Statistiques ---");
+                Console.WriteLine($"Messages eHuB reçus: {receiver.MessagesReceived}");
+                Console.WriteLine($"Entités actives: {receiver.ActiveEntities}");
+                Console.WriteLine($"Paquets ArtNet envoyés: {sender.PacketsSent}");
+
+                var map = receiver.GetIndexToEntityMapping();
+                Console.WriteLine($"🔢 Mapping Index → Entity : {map.Count} entrées");
+
+                foreach (var pair in map.Take(10)) // Affiche les 10 premiers
                 {
-                    Console.WriteLine("--- Statistiques ---");
-                    Console.WriteLine($"Messages eHuB reçus: {router.GetMessageCount()}");
-                    Console.WriteLine($"Entités actives: {router.GetEntityCount()}");
-                    Console.WriteLine($"Paquets ArtNet envoyés: {router.GetPacketsSent()}");
-                    var map = router.GetIndexMap();
-                    Console.WriteLine($"🔢 Mapping Index → Entity : {map.Count} entrées");
-                    foreach (var pair in map.Take(10))
-                        Console.WriteLine($"  Index {pair.Key} → Entity {pair.Value}");
+                    Console.WriteLine($"  Index {pair.Key} → Entity {pair.Value}");
                 }
             }
+
         }
 
-        Console.WriteLine("Arrêt du routage synchrone.");
+        // Arrêt propre
+        await router.StopAsync();
+        Console.WriteLine("Arrêt du routage.");
     }
+
 }

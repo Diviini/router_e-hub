@@ -1,23 +1,23 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
-using EmitterHub.ArtNet;
 using EmitterHub.DMX;
 
+namespace EmitterHub.ArtNet;
+
+/// <summary>
+/// Envoie les paquets ArtNet vers les contrôleurs
+/// </summary>
 public class ArtNetSender : IDisposable
 {
     private readonly UdpClient _udpClient;
-    private readonly ConcurrentDictionary<string, IPEndPoint> _endpoints;
+    private readonly Dictionary<string, IPEndPoint> _endpoints;
 
     public int PacketsSent { get; private set; }
-
-    // Nouvelle option : forcer l'envoi même si la trame est vide
-    public bool SendAllFrames { get; set; } = false;
 
     public ArtNetSender()
     {
         _udpClient = new UdpClient();
-        _endpoints = new ConcurrentDictionary<string, IPEndPoint>();
+        _endpoints = new Dictionary<string, IPEndPoint>();
     }
 
     /// <summary>
@@ -25,6 +25,8 @@ public class ArtNetSender : IDisposable
     /// </summary>
     public async Task SendDmxFrameAsync(DmxFrame frame)
     {
+        if (frame == null || !frame.HasData()) return;
+
         var packet = new ArtNetPacket(frame);
 
         if (!_endpoints.TryGetValue(frame.TargetIP, out var endpoint))
