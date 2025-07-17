@@ -2,14 +2,23 @@
     x:Class="EmitterHub.UI.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="clr-namespace:EmitterHub.UI.Converters"
     xmlns:vm="clr-namespace:EmitterHub.UI.ViewModels"
     Title="EmitterHub Dashboard"
     Width="400"
-    Height="380"
+    Height="800"
     x:DataType="vm:StatsViewModel">
 
+    <!--  Convertisseurs  -->
+    <Window.Resources>
+        <conv:ValueToBrushConverter x:Key="ValueToBrush" />
+        <conv:NullToBoolConverter x:Key="NullToBoolConverter" />
+    </Window.Resources>
+
+    <!--  Conteneur principal  -->
     <StackPanel Margin="20" Spacing="15">
-        <!--  Titre  -->
+
+        <!--  Titre des stats  -->
         <TextBlock
             HorizontalAlignment="Center"
             FontSize="24"
@@ -57,15 +66,62 @@
                 Text="{Binding ActiveFrames}" />
         </Grid>
 
-        <!--  Bouton d'arrêt  -->
-        <Button
-            Margin="0,20,0,0"
-            HorizontalAlignment="Center"
-            Command="{Binding StopRouterCommand}"
-            Content="❎ Arrêter le router" />
+        <!--  Moniteur DMX  -->
+        <TextBlock
+            FontSize="18"
+            FontWeight="Bold"
+            Text="Moniteur DMX" />
 
-        <Button Command="{Binding RestartRouterCommand}" Content="🔄 Redémarrer" />
+        <!--  Sélection d'univers  -->
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock VerticalAlignment="Center" Text="Univers :" />
+            <ComboBox
+                Width="80"
+                ItemsSource="{Binding UniverseOptions}"
+                SelectedItem="{Binding SelectedUniverse}" />
+        </StackPanel>
+
+        <!--  Activation et vidage du moniteur  -->
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <ToggleSwitch Content="Activer le moniteur" IsChecked="{Binding IsMonitorEnabled}" />
+            <Button Command="{Binding ClearMonitorCommand}" Content="Vider" />
+        </StackPanel>
+
+        <!--  Affichage temps réel de la trame courante  -->
+        <TextBlock
+            FontSize="16"
+            FontWeight="Bold"
+            Text="Instantané DMX" />
+        <TextBlock
+            FontStyle="Italic"
+            IsVisible="{Binding CurrentFrame, Converter={StaticResource NullToBoolConverter}}"
+            Text="{Binding CurrentFrame.DisplayText}" />
+
+        <!--  On enlève le ScrollViewer  -->
+        <ItemsControl IsVisible="{Binding CurrentFrame, Converter={StaticResource NullToBoolConverter}}" ItemsSource="{Binding CurrentFrame.Channels}">
+
+            <!--  On fixe la taille de chaque carré  -->
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel
+                        ItemHeight="8"
+                        ItemWidth="8"
+                        Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border
+                        Width="8"
+                        Height="8"
+                        Margin="1"
+                        Background="{Binding Converter={StaticResource ValueToBrush}}"
+                        BorderBrush="White"
+                        BorderThickness="1" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
     </StackPanel>
-
-
 </Window>

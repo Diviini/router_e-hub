@@ -11,6 +11,7 @@ public class ArtNetSender : IDisposable
 {
     private readonly UdpClient _udpClient;
     private readonly Dictionary<string, IPEndPoint> _endpoints;
+    public event Action<DmxFrame>? FrameSent;
 
     public int PacketsSent { get; private set; }
 
@@ -35,6 +36,8 @@ public class ArtNetSender : IDisposable
 
         await _udpClient.SendAsync(packet.PacketData, packet.PacketSize, endpoint);
         PacketsSent++;
+
+        FrameSent?.Invoke(frame);
     }
 
     public void Dispose()
