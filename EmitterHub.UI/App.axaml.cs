@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -31,7 +33,9 @@ public partial class App : Application
         var router = new Router(receiver, sender);
 
         // Charge ton CSV
-        CsvMappingLoader.Load("EmitterHub/Config/mapping_clean.csv", router);
+        var configDir = Path.Combine(AppContext.BaseDirectory, "Config");
+        var mappingCsv = Path.Combine(configDir, "mapping_clean.csv");
+        CsvMappingLoader.Load(mappingCsv, router);
 
         // Démarre le routage asynchrone
         _ = router.StartAsync();

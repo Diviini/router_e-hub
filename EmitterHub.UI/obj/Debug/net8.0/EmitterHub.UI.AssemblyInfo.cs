@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EmitterHub.UI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+00ccace4b4ac4ab96598b1df063f4e1accd48937")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+04fef3e38455005d5bde99f5701b2b8850625854")]
 [assembly: System.Reflection.AssemblyProductAttribute("EmitterHub.UI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EmitterHub.UI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
