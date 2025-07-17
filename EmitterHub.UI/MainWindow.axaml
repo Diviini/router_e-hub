@@ -57,15 +57,33 @@
                 Text="{Binding ActiveFrames}" />
         </Grid>
 
-        <!--  Bouton d'arrêt  -->
-        <Button
-            Margin="0,20,0,0"
-            HorizontalAlignment="Center"
-            Command="{Binding StopRouterCommand}"
-            Content="❎ Arrêter le router" />
+        <TextBlock
+            FontSize="18"
+            FontWeight="Bold"
+            Text="Moniteur DMX" />
 
-        <Button Command="{Binding RestartRouterCommand}" Content="🔄 Redémarrer" />
+        <!--  Choix de l'univers  -->
+        <ComboBox
+            Width="120"
+            Margin="0,0,0,5"
+            HorizontalAlignment="Left"
+            ItemsSource="{Binding UniverseOptions}"
+            SelectedItem="{Binding SelectedUniverse}" />
+
+        <!--  Toggle + Clear  -->
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <ToggleSwitch Content="Activer le moniteur" IsChecked="{Binding IsMonitorEnabled}" />
+            <Button Command="{Binding ClearMonitorCommand}" Content="Vider" />
+        </StackPanel>
+
+        <!--  Liste filtrée des trames  -->
+        <ListBox Height="150" ItemsSource="{Binding SentFrames}">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding DisplayText}" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
     </StackPanel>
-
 
 </Window>

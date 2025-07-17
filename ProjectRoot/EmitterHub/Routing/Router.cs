@@ -126,6 +126,12 @@ public class Router
     }
 
     /// <summary>
+    /// Renvoie la liste des univers pour lesquels on a créé des trames DMX
+    /// </summary>
+    public IEnumerable<int> GetConfiguredUniverses()
+        => _mapper.GetAllFrames().Select(f => f.Universe);
+
+    /// <summary>
     /// Arrête proprement le routeur
     /// </summary>
     public async Task StopAsync()
