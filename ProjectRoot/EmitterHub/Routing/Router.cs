@@ -12,10 +12,14 @@ public class Router
     private readonly EHubReceiver _receiver;
     private readonly ArtNetSender _sender;
     private readonly DmxMapper _mapper;
-    int MaxFps = 40;
 
     private readonly CancellationTokenSource _cancellation = new();
     private Task? _routingLoop;
+
+    // Variables pour le logging des statistiques
+    private int _tickCount = 0;
+    private DateTime _lastLogTime = DateTime.Now;
+    private int _framesSentThisSecond = 0;
 
     public Router(EHubReceiver receiver, ArtNetSender sender)
     {
@@ -52,16 +56,15 @@ public class Router
         );
     }
 
-
     /// <summary>
     /// Démarre l'écoute et le routage en tâche de fond
     /// </summary>
     public async Task StartAsync()
     {
-        var loopStart = DateTime.Now;
-
         Console.WriteLine("Démarrage du router...");
         await _receiver.StartAsync();
+
+        _lastLogTime = DateTime.Now;
 
         _routingLoop = Task.Run(async () =>
         {
@@ -69,6 +72,8 @@ public class Router
             {
                 try
                 {
+                    var loopStart = DateTime.Now;
+
                     // Mettre à jour les entités (update)
                     var entities = _receiver.GetCurrentEntities();
                     _mapper.UpdateEntities(entities);
@@ -78,13 +83,26 @@ public class Router
 
                     var sendTasks = frames.Select(frame =>
                     {
-                        LogDmxFrameToFile(frame);
+                        // LogDmxFrameToFile(frame);
                         return _sender.SendDmxFrameAsync(frame);
                     });
                     await Task.WhenAll(sendTasks);
 
+                    // Compter les frames envoyées cette seconde
+                    _framesSentThisSecond += frames.Count();
 
-                    // Attendre 25ms avant d’envoyer la prochaine série
+                    // Vérifier si une seconde s'est écoulée pour afficher les stats
+                    if ((DateTime.Now - _lastLogTime).TotalSeconds >= 1.0)
+                    {
+                        _tickCount++;
+                        Console.WriteLine($"[TICK {_tickCount}] eHuB Msgs: {_receiver.MessagesReceived} | Frames: {_framesSentThisSecond} | ArtNet sent: {_framesSentThisSecond} | Total: {_sender.PacketsSent}");
+                        
+                        // Reset pour la prochaine seconde
+                        _framesSentThisSecond = 0;
+                        _lastLogTime = DateTime.Now;
+                    }
+
+                    // Attendre 25ms avant d'envoyer la prochaine série
                     var elapsed = DateTime.Now - loopStart;
                     int remainingMs = Math.Max(0, 25 - (int)elapsed.TotalMilliseconds);
                     await Task.Delay(remainingMs, _cancellation.Token);
@@ -96,7 +114,6 @@ public class Router
                 }
             }
         });
-
 
         Console.WriteLine("Boucle de routage en cours...");
     }
@@ -153,5 +170,4 @@ public class Router
             Console.WriteLine($"Erreur lors du log DMX : {ex.Message}");
         }
     }
-
 }
