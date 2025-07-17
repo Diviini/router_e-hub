@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -6,10 +7,15 @@ using EmitterHub.eHub;
 using EmitterHub.Routing;
 using EmitterHub.UI.ViewModels;
 
+
 namespace EmitterHub.UI;
 
 public partial class App : Application
 {
+
+    [DllImport("kernel32.dll")]
+    private static extern bool AllocConsole();
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -17,6 +23,8 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        AllocConsole();
+
         // 1) Instancie les composants métier (comme dans ton Main console)
         var receiver = new EHubReceiver(port: 8765, targetUniverse: 1);
         var sender = new ArtNetSender();
