@@ -1,15 +1,15 @@
+using System;
 using System.Timers;
+using System.Linq;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Avalonia.Threading;
 using EmitterHub.eHub;
 using EmitterHub.ArtNet;
 using EmitterHub.Routing;
-using System.Threading.Tasks;
-using Avalonia.Threading;
-using System.Collections.ObjectModel;
 using EmitterHub.DMX;
-using System.Linq;
-using System.Collections.Generic;
 
 namespace EmitterHub.UI.ViewModels
 {
@@ -18,15 +18,10 @@ namespace EmitterHub.UI.ViewModels
         private readonly Router _router;
         private readonly EHubReceiver _receiver;
         private readonly ArtNetSender _sender;
-        private readonly Timer _timer;
-        private bool _frameUpdatePending = false;
-        private FrameInfo? _lastFrame;
+        private readonly Timer _statsTimer;
 
-        // ➊ Collection pour afficher les trames
-        public ObservableCollection<FrameInfo> SentFrames { get; } = new();
-
-
-
+        // Stocke la dernière trame reçue
+        private FrameInfo? _pendingFrame;
 
         public StatsViewModel(Router router, EHubReceiver receiver, ArtNetSender sender)
         {
@@ -34,80 +29,67 @@ namespace EmitterHub.UI.ViewModels
             _receiver = receiver;
             _sender = sender;
 
-            UniverseOptions = router.GetConfiguredUniverses().ToList();
+            // Initialisation des univers configurés
+            UniverseOptions = _router.GetConfiguredUniverses().ToList();
             if (UniverseOptions.Any())
                 SelectedUniverse = UniverseOptions.First();
 
-            // Timer pour rafraîchir toutes les 250 ms
-            _timer = new Timer(250);
-            _timer.Elapsed += (_, __) => Refresh();
-            _timer.Start();
+            // Timer pour rafraîchir les statistiques et la vue du moniteur à 4 Hz
+            _statsTimer = new Timer(250);
+            _statsTimer.Elapsed += (_, __) => Refresh();
+            _statsTimer.Start();
 
-            sender.FrameSent += OnFrameSent;
+            // Souscription aux trames
+            _sender.FrameSent += OnFrameSent;
         }
-        // ➍ Quand on change d'univers, on vide le moniteur
-        partial void OnSelectedUniverseChanged(int value)
-            => SentFrames.Clear();
 
-        // Propriétés bindées à la vue
+        // --- Propriétés de statistiques ---
         [ObservableProperty] private int messagesReceived;
         [ObservableProperty] private int activeEntities;
         [ObservableProperty] private int packetsSent;
         [ObservableProperty] private int totalUniverses;
         [ObservableProperty] private int totalMappings;
         [ObservableProperty] private int activeFrames;
-        [ObservableProperty] private bool isMonitorEnabled = false;
+
+        // --- Propriétés du moniteur ---
+        [ObservableProperty] private bool isMonitorEnabled;
         [ObservableProperty] private List<int> universeOptions = new();
         [ObservableProperty] private int selectedUniverse;
+        [ObservableProperty] private FrameInfo? currentFrame;
 
         partial void OnIsMonitorEnabledChanged(bool value)
         {
             if (!value)
-                SentFrames.Clear();
+                CurrentFrame = null;
         }
+
+        partial void OnSelectedUniverseChanged(int value)
+        {
+            CurrentFrame = null;
+        }
+
+        // Capture la trame reçue mais ne met pas à jour l'UI immédiatement
         private void OnFrameSent(DmxFrame frame)
         {
-            if (!IsMonitorEnabled)
+            if (!IsMonitorEnabled || frame.Universe != SelectedUniverse)
                 return;
 
-            if (frame.Universe != SelectedUniverse)
-                return;
-
-            // Préparer la dernière frame
-            _lastFrame = new FrameInfo(
+            // Clone pour thread-safety
+            var channels = frame.Channels.ToArray();
+            _pendingFrame = new FrameInfo(
                 frame.Universe,
                 frame.TargetIP,
-                frame.Channels.Count(b => b > 0)
+                channels.Count(b => b > 0),
+                channels
             );
-
-            // Si une mise à jour UI est déjà en attente, on sort
-            if (_frameUpdatePending)
-                return;
-
-            _frameUpdatePending = true;
-            Dispatcher.UIThread.Post(() =>
-            {
-                try
-                {
-                    if (_lastFrame is not null)
-                    {
-                        SentFrames.Add(_lastFrame);
-                        if (SentFrames.Count > 200)
-                            SentFrames.RemoveAt(0);
-                    }
-                }
-                finally
-                {
-                    _frameUpdatePending = false;
-                }
-            });
         }
 
-        // Méthode de rafraîchissement des valeurs
+        // Met à jour stats et moniteur à intervalle régulier sur le thread UI
         private void Refresh()
         {
             Dispatcher.UIThread.Post(() =>
             {
+                // Statistiques générales
                 MessagesReceived = _receiver.MessagesReceived;
                 ActiveEntities = _receiver.ActiveEntities;
                 PacketsSent = _sender.PacketsSent;
@@ -116,39 +98,41 @@ namespace EmitterHub.UI.ViewModels
                 TotalUniverses = stats.TotalUniverses;
                 TotalMappings = stats.TotalEntities;
                 ActiveFrames = stats.ActiveFrames;
+
+                // Mise à jour du moniteur en temps réel
+                if (IsMonitorEnabled)
+                {
+                    CurrentFrame = _pendingFrame;
+                }
             });
         }
 
-        // Commande pour arrêter proprement le router
         [RelayCommand]
         private async Task StopRouterAsync()
         {
-            _timer.Stop();
+            _statsTimer.Stop();
             await _router.StopAsync();
         }
 
         [RelayCommand]
         private async Task RestartRouterAsync()
         {
-            _timer.Stop();
+            _statsTimer.Stop();
             await _router.StopAsync();
             await _router.StartAsync();
-            _timer.Start();
+            _statsTimer.Start();
         }
 
-        // ➍ Commande pour vider le moniteur
         [RelayCommand]
         private void ClearMonitor()
         {
-            SentFrames.Clear();
+            CurrentFrame = null;
+            _pendingFrame = null;
         }
-
     }
 
-    // Si tu l'avais imbriqué dans StatsViewModel, tu peux aussi le sortir au niveau du namespace
-    public record FrameInfo(int Universe, string TargetIP, int ActiveChannels)
+    public record FrameInfo(int Universe, string TargetIP, int ActiveChannels, byte[] Channels)
     {
-        public string DisplayText =>
-            $"U{Universe} → {TargetIP} ({ActiveChannels} canaux)";
+        public string DisplayText => $"U{Universe} → {TargetIP} ({ActiveChannels} canaux)";
     }
 }
