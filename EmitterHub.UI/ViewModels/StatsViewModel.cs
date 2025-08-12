@@ -62,10 +62,17 @@ namespace EmitterHub.UI.ViewModels
         [ObservableProperty] private int selectedUniverse;
         [ObservableProperty] private FrameInfo? currentFrame;
 
-         // [E2] --- Moniteur eHuB ---
+        // [E2] --- Moniteur eHuB ---
         [ObservableProperty] private bool isEhubMonitorEnabled;     // toggle
         [ObservableProperty] private int ehubFps;                   // FPS instantané (messages/s)
         public ObservableCollection<int> EhubFpsHistory { get; } = new(); // historique borné 0..60
+
+        // [E5] --- Moniteur DMX (liste univers) ---
+        [ObservableProperty] private bool showActiveUniversesOnly = true;
+        public ObservableCollection<UniverseRow> UniverseRows { get; } = new();
+
+        [ObservableProperty] private int totalPps; // paquets/s total
+        [ObservableProperty] private int totalBps; // octets/s total
 
 
         partial void OnIsMonitorEnabledChanged(bool value)
@@ -134,6 +141,28 @@ namespace EmitterHub.UI.ViewModels
                     _prevMsgCount = _receiver.MessagesReceived;
                 }
 
+                // [E5] récupérer snapshot DMX
+                int pps, bps;
+                var rows = _sender.GetStatsSnapshot(ShowActiveUniversesOnly, out pps, out bps);
+
+                TotalPps = pps;
+                TotalBps = bps;
+
+                // Sync minimal (remplace tout : simple et suffisant à 4 Hz)
+                UniverseRows.Clear();
+                foreach (var r in rows)
+                {
+                    UniverseRows.Add(new UniverseRow
+                    {
+                        Universe = r.Universe,
+                        TargetIP = r.TargetIP,
+                        PacketRatePerSec = r.PacketRatePerSec,
+                        ByteRatePerSec = r.ByteRatePerSec,
+                        LastActiveChannels = r.LastActiveChannels,
+                        LastSent = r.LastSentLocal.ToString("HH:mm:ss")
+                    });
+                }
+
                 // Mise à jour du moniteur en temps réel
                 if (IsMonitorEnabled)
                 {
@@ -169,5 +198,16 @@ namespace EmitterHub.UI.ViewModels
     public record FrameInfo(int Universe, string TargetIP, int ActiveChannels, byte[] Channels)
     {
         public string DisplayText => $"U{Universe} → {TargetIP} ({ActiveChannels} canaux)";
+    }
+    
+    // [E5] Row pour le tableau
+    public class UniverseRow
+    {
+        public int Universe { get; set; }
+        public string TargetIP { get; set; } = string.Empty;
+        public int PacketRatePerSec { get; set; }
+        public int ByteRatePerSec { get; set; }
+        public int LastActiveChannels { get; set; }
+        public string LastSent { get; set; } = "";
     }
 }

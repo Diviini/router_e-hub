@@ -100,6 +100,59 @@
             </Grid>
         </Border>
 
+        <!-- [E5] Moniteur de sortie (univers) -->
+        <TextBlock FontSize="18" FontWeight="Bold" Text="Moniteur de sortie (ArtNet)" />
+
+        <StackPanel Orientation="Horizontal" Spacing="10">
+        <ToggleSwitch Content="Univers actifs seulement"
+                        IsChecked="{Binding ShowActiveUniversesOnly}" />
+        <TextBlock VerticalAlignment="Center" Text="Total:" />
+        <TextBlock VerticalAlignment="Center" Text="{Binding TotalPps}" />
+        <TextBlock VerticalAlignment="Center" Text="pps," />
+        <TextBlock VerticalAlignment="Center" Text="{Binding TotalBps}" />
+        <TextBlock VerticalAlignment="Center" Text="octets/s" />
+        </StackPanel>
+
+        <Border Background="#101318" CornerRadius="8" Padding="8">
+        <Grid>
+            <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Entêtes -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*,*,*"
+                Margin="0,0,0,6">
+            <TextBlock Grid.Column="0" Text="Univers" FontWeight="Bold"/>
+            <TextBlock Grid.Column="1" Text="IP" FontWeight="Bold"/>
+            <TextBlock Grid.Column="2" Text="Paquets/s" FontWeight="Bold"/>
+            <TextBlock Grid.Column="3" Text="Octets/s" FontWeight="Bold"/>
+            <TextBlock Grid.Column="4" Text="Canaux actifs" FontWeight="Bold"/>
+            <TextBlock Grid.Column="5" Text="Dernier envoi" FontWeight="Bold"/>
+            </Grid>
+
+            <!-- Lignes -->
+            <ScrollViewer Grid.Row="1" Height="180">
+            <ItemsControl ItemsSource="{Binding UniverseRows}">
+                <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnDefinitions="*,*,*,*,*,*"
+                        Margin="0,2">
+                    <TextBlock Grid.Column="0" Text="{Binding Universe}"/>
+                    <TextBlock Grid.Column="1" Text="{Binding TargetIP}"/>
+                    <TextBlock Grid.Column="2" Text="{Binding PacketRatePerSec}"/>
+                    <TextBlock Grid.Column="3" Text="{Binding ByteRatePerSec}"/>
+                    <TextBlock Grid.Column="4" Text="{Binding LastActiveChannels}"/>
+                    <TextBlock Grid.Column="5" Text="{Binding LastSent}"/>
+                    </Grid>
+                </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+        </Border>
+
+
         <!--  Moniteur DMX  -->
         <TextBlock
             FontSize="18"
@@ -130,6 +183,9 @@
             FontStyle="Italic"
             IsVisible="{Binding CurrentFrame, Converter={StaticResource NullToBoolConverter}}"
             Text="{Binding CurrentFrame.DisplayText}" />
+
+        
+        
 
         <!--  On enlève le ScrollViewer  -->
         <ItemsControl IsVisible="{Binding CurrentFrame, Converter={StaticResource NullToBoolConverter}}" ItemsSource="{Binding CurrentFrame.Channels}">
