@@ -2,6 +2,7 @@ using System;
 using System.Timers;
 using System.Linq;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -22,6 +23,10 @@ namespace EmitterHub.UI.ViewModels
 
         // Stocke la dernière trame reçue
         private FrameInfo? _pendingFrame;
+
+        // [E2] --- Champs internes pour FPS eHuB ---
+        private int _prevMsgCount = 0;
+        private const int EhUbHistorySize = 120; // ~30s à 4Hz
 
         public StatsViewModel(Router router, EHubReceiver receiver, ArtNetSender sender)
         {
@@ -56,6 +61,12 @@ namespace EmitterHub.UI.ViewModels
         [ObservableProperty] private List<int> universeOptions = new();
         [ObservableProperty] private int selectedUniverse;
         [ObservableProperty] private FrameInfo? currentFrame;
+
+         // [E2] --- Moniteur eHuB ---
+        [ObservableProperty] private bool isEhubMonitorEnabled;     // toggle
+        [ObservableProperty] private int ehubFps;                   // FPS instantané (messages/s)
+        public ObservableCollection<int> EhubFpsHistory { get; } = new(); // historique borné 0..60
+
 
         partial void OnIsMonitorEnabledChanged(bool value)
         {
@@ -98,6 +109,30 @@ namespace EmitterHub.UI.ViewModels
                 TotalUniverses = stats.TotalUniverses;
                 TotalMappings = stats.TotalEntities;
                 ActiveFrames = stats.ActiveFrames;
+
+                // [E2] Calcul FPS eHuB + historique (uniquement si activé)
+                if (IsEhubMonitorEnabled)
+                {
+                    int cur = _receiver.MessagesReceived;
+                    int delta = Math.Max(0, cur - _prevMsgCount);
+                    _prevMsgCount = cur;
+
+                    // timer = 250ms -> *4 pour messages/s
+                    int fps = (int)Math.Round(delta * (1000.0 / _statsTimer.Interval));
+                    // borne visuelle 0..60 pour notre graphe vertical de 60px
+                    fps = Math.Clamp(fps, 0, 60);
+
+                    EhubFps = fps;
+
+                    if (EhubFpsHistory.Count >= EhUbHistorySize)
+                        EhubFpsHistory.RemoveAt(0);
+                    EhubFpsHistory.Add(fps);
+                }
+                else
+                {
+                    // quand OFF, on ne fait rien et on fige l'historique
+                    _prevMsgCount = _receiver.MessagesReceived;
+                }
 
                 // Mise à jour du moniteur en temps réel
                 if (IsMonitorEnabled)

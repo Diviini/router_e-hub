@@ -66,6 +66,40 @@
                 Text="{Binding ActiveFrames}" />
         </Grid>
 
+        <!-- [E2] Moniteur eHuB -->
+        <TextBlock FontSize="18" FontWeight="Bold" Text="Moniteur eHuB" />
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <ToggleSwitch Content="Activer le moniteur eHuB" IsChecked="{Binding IsEhubMonitorEnabled}" />
+            <TextBlock VerticalAlignment="Center" Text="FPS :" />
+            <TextBlock VerticalAlignment="Center" FontWeight="Bold" Text="{Binding EhubFps}" />
+        </StackPanel>
+
+        <!-- [E2] Sparkline simple des FPS (barres) -->
+        <Border Background="#101318" CornerRadius="8" Padding="8">
+            <Grid RowDefinitions="Auto,Auto">
+                <TextBlock Foreground="#aaa" FontSize="12" Text="Historique FPS (0–60)" />
+                <Border Grid.Row="1" Height="60" Margin="0,6,0,0" Background="#1b2030" CornerRadius="4" ClipToBounds="True">
+                    <ItemsControl ItemsSource="{Binding EhubFpsHistory}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <!-- Hauteur = valeur bornée 0..60, alignée en bas -->
+                                <Border Width="4" Margin="1,0" Background="#64B5F6" VerticalAlignment="Bottom">
+                                    <Border.Height>
+                                        <Binding />
+                                    </Border.Height>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </Grid>
+        </Border>
+
         <!--  Moniteur DMX  -->
         <TextBlock
             FontSize="18"
