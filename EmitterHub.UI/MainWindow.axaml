@@ -15,6 +15,8 @@
         <conv:NullToBoolConverter x:Key="NullToBoolConverter" />
     </Window.Resources>
 
+    <ScrollViewer>
+
     <!--  Conteneur principal  -->
     <StackPanel Margin="20" Spacing="15">
 
@@ -213,5 +215,35 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
+        <!-- ===================== E8 : Patch Map ===================== -->
+        <TextBlock FontSize="18" FontWeight="Bold" Text="Patch Map (E8)" />
+
+        <!-- Ligne de commandes -->
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Content="Charger CSV Patch…" Command="{Binding LoadPatchCsvCommand}" />
+            <ToggleSwitch Content="Appliquer" IsChecked="{Binding IsPatchEnabled}" />
+        </StackPanel>
+
+        <!-- Infos fichier + stats -->
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,6,0,6">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Fichier :" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding PatchFilePath}" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Règles :" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PatchRuleCount}" />
+        </Grid>
+
+        <!-- Tableau des règles 
+        <Border Background="#101318" CornerRadius="8" Padding="8">
+            <DataGrid ItemsSource="{Binding PatchRules}" AutoGenerateColumns="False" HeadersVisibility="Column" IsReadOnly="True" Height="200">
+                <DataGrid.Columns>
+                <DataGridTextColumn Header="Src Universe" Binding="{Binding SrcUniverse}" Width="*" />
+                <DataGridTextColumn Header="Src Channel" Binding="{Binding SrcChannel}" Width="*" />
+                <DataGridTextColumn Header="Dst Universe" Binding="{Binding DstUniverse}" Width="*" />
+                <DataGridTextColumn Header="Dst Channel" Binding="{Binding DstChannel}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border> -->
+
     </StackPanel>
+    </ScrollViewer>
 </Window>

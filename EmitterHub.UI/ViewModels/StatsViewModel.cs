@@ -11,6 +11,10 @@ using EmitterHub.eHub;
 using EmitterHub.ArtNet;
 using EmitterHub.Routing;
 using EmitterHub.DMX;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+
 
 namespace EmitterHub.UI.ViewModels
 {
@@ -73,6 +77,91 @@ namespace EmitterHub.UI.ViewModels
 
         [ObservableProperty] private int totalPps; // paquets/s total
         [ObservableProperty] private int totalBps; // octets/s total
+
+
+        // [E8] --- Patch Map ---
+        [ObservableProperty] private bool isPatchEnabled;      // toggle appliquer/ignorer
+        [ObservableProperty] private string? patchFilePath;
+        [ObservableProperty] private int patchRuleCount;
+
+        public ObservableCollection<PatchRuleRow> PatchRules { get; } = new();
+
+        // commande : Charger un CSV de patch
+        [RelayCommand]
+        private async Task LoadPatchCsvAsync()
+        {
+            try
+            {
+                var window = GetMainWindow();
+                if (window is null) return;
+
+                var ofd = new OpenFileDialog
+                {
+                    Title = "Charger un CSV de Patch Map",
+                    AllowMultiple = false,
+                    Filters = new List<FileDialogFilter>
+                    {
+                        new FileDialogFilter { Name = "CSV", Extensions = { "csv" } },
+                        new FileDialogFilter { Name = "Tous les fichiers", Extensions = { "*" } }
+                    }
+                };
+
+                var res = await ofd.ShowAsync(window);
+                
+                if (res is null || res.Length == 0) return;
+
+                var path = res[0];
+                var map  = CsvPatchLoader.Load(path);
+
+                // appliquer côté router mais sans activer automatiquement
+                _router.SetPatchMap(map);
+                PatchFilePath  = path;
+                PatchRuleCount = map.Rules.Count;
+
+                // remplir l'UI
+                PatchRules.Clear();
+                foreach (var r in map.Rules)
+                {
+                    PatchRules.Add(new PatchRuleRow
+                    {
+                        SrcUniverse = r.SrcUniverse,
+                        SrcChannel  = r.SrcChannel,
+                        DstUniverse = r.DstUniverse,
+                        DstChannel  = r.DstChannel
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur chargement Patch CSV : {ex.Message}");
+            }
+        }
+
+        // toggle appliquer/ignorer (ON = appliqué)
+        partial void OnIsPatchEnabledChanged(bool value)
+        {
+            _router.EnablePatch(value);
+        }
+
+        // helper pour récupérer la fenêtre²
+        private static Window? GetMainWindow()
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                return desktop.MainWindow;
+            }
+            return null;
+        }
+
+        // Row pour DataGrid
+        public class PatchRuleRow
+        {
+            public int SrcUniverse { get; set; }
+            public int SrcChannel  { get; set; }
+            public int DstUniverse { get; set; }
+            public int DstChannel  { get; set; }
+        }
+
 
 
         partial void OnIsMonitorEnabledChanged(bool value)

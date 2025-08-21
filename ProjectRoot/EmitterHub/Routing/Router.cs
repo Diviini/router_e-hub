@@ -16,6 +16,10 @@ public class Router
     private CancellationTokenSource? _cancellation;
     private Task? _routingLoop;
 
+    // [E8] --- Patch Map ---
+    private PatchMap? _patchMap;
+    private volatile bool _patchEnabled = false;
+
     // Variables pour le logging des statistiques
     private int _tickCount = 0;
     private DateTime _lastLogTime = DateTime.Now;
@@ -56,6 +60,16 @@ public class Router
         );
     }
 
+    // [E8] --- API Patch ---
+    public void SetPatchMap(PatchMap? map)
+    {
+        _patchMap = map;
+    }
+
+    public void EnablePatch(bool enabled) => _patchEnabled = enabled;
+
+    public int PatchRules => _patchMap?.Rules.Count ?? 0;
+
     /// <summary>
     /// Démarre l'écoute et le routage en tâche de fond
     /// </summary>
@@ -84,6 +98,12 @@ public class Router
                     // Mettre à jour les entités (update)
                     var entities = _receiver.GetCurrentEntities();
                     _mapper.UpdateEntities(entities);
+
+                    // 2) [E8] Patch : applique les redirections de canaux (si activé)
+                    if (_patchEnabled && _patchMap is not null)
+                    {
+                        _patchMap.Apply(_mapper.GetAllFrames());
+                    }
 
                     // Récupérer toutes les trames avec données
                     var frames = _mapper.GetAllFrames();
