@@ -16,8 +16,11 @@ public class ArtNetSender : IDisposable
 
     public int PacketsSent { get; private set; }
 
+    // NEW: active le miroir local (pour le moniteur E9)
+    public bool EchoToLocal { get; set; } = true;
+
     // [E5] --- Stats par univers ---
-        private readonly ConcurrentDictionary<int, UniverseTxStats> _stats = new();
+    private readonly ConcurrentDictionary<int, UniverseTxStats> _stats = new();
 
     public ArtNetSender()
     {
@@ -41,17 +44,31 @@ public class ArtNetSender : IDisposable
         await _udpClient.SendAsync(packet.PacketData, packet.PacketSize, endpoint);
         PacketsSent++;
 
-         // [E5] MAJ stats
-            var active = frame.Channels.Count(b => b > 0);
-            var now = DateTime.UtcNow;
+        // 
+        var sd = _stats.GetOrAdd(frame.Universe, _ => new UniverseTxStats(frame.Universe));
+        sd.AddBytesThisTick(packet.PacketSize);
 
-            var st = _stats.GetOrAdd(frame.Universe, _ => new UniverseTxStats(frame.Universe));
-            st.TargetIP = frame.TargetIP;
-            st.TotalPackets++;
-            st.TotalBytes += packet.PacketSize;
-            st.LastSentUtc = now;
-            st.LastActiveChannels = active;
-            st.TicksThisSecond++;
+        // NEW: miroir local 127.0.0.1:6454 pour le moniteur
+        if (EchoToLocal)
+        {
+            var loopback = new IPEndPoint(IPAddress.Loopback, ArtNetPacket.ARTNET_PORT);
+            await _udpClient.SendAsync(packet.PacketData, packet.PacketSize, loopback);
+
+            sd.AddBytesThisTick(packet.PacketSize);
+        }
+
+
+         // [E5] MAJ stats
+        var active = frame.Channels.Count(b => b > 0);
+        var now = DateTime.UtcNow;
+
+        var st = _stats.GetOrAdd(frame.Universe, _ => new UniverseTxStats(frame.Universe));
+        st.TargetIP = frame.TargetIP;
+        st.TotalPackets++;
+        st.TotalBytes += packet.PacketSize;
+        st.LastSentUtc = now;
+        st.LastActiveChannels = active;
+        st.TicksThisSecond++;
 
         FrameSent?.Invoke(frame);
     }

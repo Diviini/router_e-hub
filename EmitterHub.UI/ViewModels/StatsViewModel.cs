@@ -14,6 +14,7 @@ using EmitterHub.DMX;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using System.Collections.Concurrent;
 
 
 namespace EmitterHub.UI.ViewModels
@@ -31,6 +32,15 @@ namespace EmitterHub.UI.ViewModels
         // [E2] --- Champs internes pour FPS eHuB ---
         private int _prevMsgCount = 0;
         private const int EhUbHistorySize = 120; // ~30s à 4Hz
+
+        // === [E9] ArtNet Monitor ===
+        private readonly ArtNetListener _artnetListener = new();
+
+        // --- E9: snapshot par univers ---
+        private readonly ConcurrentDictionary<int, ArtnetFrameRow> _artnetLatest = new();
+
+        [ObservableProperty] private bool isArtnetMonitorEnabled;
+        public ObservableCollection<ArtnetFrameRow> ArtnetFrames { get; } = new();
 
         public StatsViewModel(Router router, EHubReceiver receiver, ArtNetSender sender)
         {
@@ -50,7 +60,29 @@ namespace EmitterHub.UI.ViewModels
 
             // Souscription aux trames
             _sender.FrameSent += OnFrameSent;
+
+            // E9: on s'abonne aux frames reçues
+            _artnetListener.FrameReceived += OnArtnetFrameReceived;
         }
+
+        private void OnArtnetFrameReceived(ArtnetFrameRow row)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                // bornage à 200 lignes par ex.
+                // if (ArtnetFrames.Count >= 200) ArtnetFrames.RemoveAt(0);
+                // ArtnetFrames.Add(row);
+                _artnetLatest[row.Universe] = row;
+            });
+        }
+
+
+        partial void OnIsArtnetMonitorEnabledChanged(bool value)
+        {
+            if (value) _artnetListener.Start();
+            else       _artnetListener.Stop();
+        }
+
 
         // --- Propriétés de statistiques ---
         [ObservableProperty] private int messagesReceived;
@@ -107,15 +139,15 @@ namespace EmitterHub.UI.ViewModels
                 };
 
                 var res = await ofd.ShowAsync(window);
-                
+
                 if (res is null || res.Length == 0) return;
 
                 var path = res[0];
-                var map  = CsvPatchLoader.Load(path);
+                var map = CsvPatchLoader.Load(path);
 
                 // appliquer côté router mais sans activer automatiquement
                 _router.SetPatchMap(map);
-                PatchFilePath  = path;
+                PatchFilePath = path;
                 PatchRuleCount = map.Rules.Count;
 
                 // remplir l'UI
@@ -125,9 +157,9 @@ namespace EmitterHub.UI.ViewModels
                     PatchRules.Add(new PatchRuleRow
                     {
                         SrcUniverse = r.SrcUniverse,
-                        SrcChannel  = r.SrcChannel,
+                        SrcChannel = r.SrcChannel,
                         DstUniverse = r.DstUniverse,
-                        DstChannel  = r.DstChannel
+                        DstChannel = r.DstChannel
                     });
                 }
             }
@@ -157,9 +189,9 @@ namespace EmitterHub.UI.ViewModels
         public class PatchRuleRow
         {
             public int SrcUniverse { get; set; }
-            public int SrcChannel  { get; set; }
+            public int SrcChannel { get; set; }
             public int DstUniverse { get; set; }
-            public int DstChannel  { get; set; }
+            public int DstChannel { get; set; }
         }
 
 
@@ -257,6 +289,19 @@ namespace EmitterHub.UI.ViewModels
                 {
                     CurrentFrame = _pendingFrame;
                 }
+
+                // --- E9: pousser l’instantané à l’UI 4 Hz ---
+                if (IsArtnetMonitorEnabled)
+                {
+                    // on prend un snapshot thread-safe
+                    var snapshot = _artnetLatest.Values
+                                    .OrderBy(v => v.Universe)
+                                    .ToList();
+
+                    ArtnetFrames.Clear();
+                    foreach (var r in snapshot)
+                        ArtnetFrames.Add(r);
+}
             });
         }
 
@@ -264,6 +309,7 @@ namespace EmitterHub.UI.ViewModels
         private async Task StopRouterAsync()
         {
             _statsTimer.Stop();
+            _artnetListener.Stop();
             await _router.StopAsync();
         }
 
@@ -288,7 +334,7 @@ namespace EmitterHub.UI.ViewModels
     {
         public string DisplayText => $"U{Universe} → {TargetIP} ({ActiveChannels} canaux)";
     }
-    
+
     // [E5] Row pour le tableau
     public class UniverseRow
     {
@@ -299,4 +345,7 @@ namespace EmitterHub.UI.ViewModels
         public int LastActiveChannels { get; set; }
         public string LastSent { get; set; } = "";
     }
+
+    
+
 }

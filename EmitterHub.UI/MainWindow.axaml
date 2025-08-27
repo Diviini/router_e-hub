@@ -244,6 +244,35 @@
             </DataGrid>
         </Border> -->
 
+        <TextBlock FontSize="18" FontWeight="Bold" Text="ArtNet Monitor (E9)" />
+        <ToggleSwitch Content="Activer le moniteur ArtNet" IsChecked="{Binding IsArtnetMonitorEnabled}" />
+
+        <Border Background="#101318" CornerRadius="8" Padding="8">
+        <ScrollViewer Height="180">
+            <ListBox ItemsSource="{Binding ArtnetFrames}">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                <Grid ColumnDefinitions="*,2*,*,*,2*" Margin="0,2">
+                    <TextBlock Grid.Column="0" Text="{Binding Universe}" />
+                    <TextBlock Grid.Column="1" Text="{Binding SourceIP}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Length}" />
+                    <TextBlock Grid.Column="3" Text="{Binding ActiveChannels}" />
+                    <TextBlock Grid.Column="4" Text="{Binding TimestampText}" />
+                </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+            </ListBox>
+        </ScrollViewer>
+        </Border>
+
+
+
     </StackPanel>
     </ScrollViewer>
 </Window>
