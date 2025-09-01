@@ -271,6 +271,40 @@
         </ScrollViewer>
         </Border>
 
+        <!--
+        <TextBlock FontSize="18" FontWeight="Bold" Text="Entité Faker (E10)" />
+        <ToggleSwitch Content="Activer le faker eHuB" IsChecked="{Binding IsEhubFakerEnabled}" />
+        <TextBlock FontStyle="Italic" Text="Simule des entités colorées sans Unity" />
+        -->
+
+        <!-- ===================== E10 : Contrôle couleur plein écran ===================== -->
+        <TextBlock FontSize="18" FontWeight="Bold" Text="Faker plein écran (E10)" />
+
+        <StackPanel Orientation="Horizontal" Spacing="10">
+        <ToggleSwitch Content="Activer Faker plein écran" IsChecked="{Binding IsFullFakerEnabled}" />
+        <Button Content="Appliquer à l’écran" Command="{Binding ApplySolidColorCommand}" />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="0,6,0,6">
+        <!-- R -->
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="R :" VerticalAlignment="Center"/>
+        <Slider    Grid.Row="0" Grid.Column="1" Minimum="0" Maximum="255" Value="{Binding ColorR}" />
+        <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding ColorR}" />
+
+        <!-- G -->
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="G :" VerticalAlignment="Center"/>
+        <Slider    Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="255" Value="{Binding ColorG}" />
+        <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding ColorG}" />
+
+        <!-- B -->
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="B :" VerticalAlignment="Center"/>
+        <Slider    Grid.Row="2" Grid.Column="1" Minimum="0" Maximum="255" Value="{Binding ColorB}" />
+        <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding ColorB}" />
+        </Grid>
+
+
+        
+
 
 
     </StackPanel>
