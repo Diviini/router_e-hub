@@ -210,4 +210,7 @@ public class Router
     {
         return _mapper.GetStats();
     }
+
+    public IReadOnlyList<EntityRange> GetEntityRanges()
+    => _mapper.GetDeclaredRanges();
 }

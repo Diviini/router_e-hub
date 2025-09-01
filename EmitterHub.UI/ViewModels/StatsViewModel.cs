@@ -80,8 +80,51 @@ namespace EmitterHub.UI.ViewModels
         partial void OnIsArtnetMonitorEnabledChanged(bool value)
         {
             if (value) _artnetListener.Start();
-            else       _artnetListener.Stop();
+            else _artnetListener.Stop();
         }
+
+        private readonly EHubFaker _fullFaker = new();
+
+        // toggle UI
+        [ObservableProperty] private bool isFullFakerEnabled;
+        [ObservableProperty] private byte colorR = 255;
+        [ObservableProperty] private byte colorG = 255;
+        [ObservableProperty] private byte colorB = 255;
+
+        // Quand on coche/ décoche le toggle
+        partial void OnIsFullFakerEnabledChanged(bool value)
+        {
+            if (value)
+            {
+                // 1) passer les ranges mappés au faker
+                var ranges = _router.GetEntityRanges();
+                _fullFaker.SetRangesFromRouter(ranges);
+
+                // 2) aligner l’univers eHuB
+                _fullFaker.EhubUniverse = 1; // idem receiver
+
+                // 3) couleur courante
+                _fullFaker.SolidR = ColorR;
+                _fullFaker.SolidG = ColorG;
+                _fullFaker.SolidB = ColorB;
+
+                _fullFaker.Start();
+            }
+            else
+            {
+                _fullFaker.Stop();
+            }
+        }
+
+        // Bouton “Appliquer à l’écran” (met à jour la couleur à la volée)
+        [RelayCommand]
+        private void ApplySolidColor()
+        {
+            _fullFaker.SolidR = ColorR;
+            _fullFaker.SolidG = ColorG;
+            _fullFaker.SolidB = ColorB;
+        }
+
 
 
         // --- Propriétés de statistiques ---
@@ -301,7 +344,7 @@ namespace EmitterHub.UI.ViewModels
                     ArtnetFrames.Clear();
                     foreach (var r in snapshot)
                         ArtnetFrames.Add(r);
-}
+                }
             });
         }
 
@@ -345,6 +388,8 @@ namespace EmitterHub.UI.ViewModels
         public int LastActiveChannels { get; set; }
         public string LastSent { get; set; } = "";
     }
+
+    
 
     
 
