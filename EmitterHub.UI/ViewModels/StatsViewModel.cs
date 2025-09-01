@@ -3,79 +3,119 @@ using System.Timers;
 using System.Linq;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Threading;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using EmitterHub.eHub;
 using EmitterHub.ArtNet;
 using EmitterHub.Routing;
 using EmitterHub.DMX;
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-using System.Collections.Concurrent;
-
 
 namespace EmitterHub.UI.ViewModels
 {
+    /// <summary>
+    /// ViewModel principal de l'UI. 
+    /// - Centralise les statistiques
+    /// - Active les moniteurs (eHuB, DMX, ArtNet)
+    /// - Gère le PatchMap
+    /// - Fournit un Faker (plein écran) pour tester sans matériel
+    /// </summary>
     public partial class StatsViewModel : ObservableObject
     {
-        private readonly Router _router;
-        private readonly EHubReceiver _receiver;
-        private readonly ArtNetSender _sender;
-        private readonly Timer _statsTimer;
+        // ===================== Dépendances =====================
+        private readonly Router _router;            // Responsable du routage entités -> DMX
+        private readonly EHubReceiver _receiver;    // Récepteur eHuB (messages Unity/Faker)
+        private readonly ArtNetSender _sender;      // Émetteur ArtNet
+        private readonly Timer _statsTimer;         // Timer 250ms pour rafraîchir l’UI
 
-        // Stocke la dernière trame reçue
-        private FrameInfo? _pendingFrame;
+        // ===================== Etats internes =====================
+        private FrameInfo? _pendingFrame;           // Dernière trame DMX en attente (pour le moniteur instantané)
+        private int _prevMsgCount = 0;              // Pour calcul du FPS eHuB
+        private const int EhUbHistorySize = 120;    // Historique eHuB (30s à 4Hz)
 
-        // [E2] --- Champs internes pour FPS eHuB ---
-        private int _prevMsgCount = 0;
-        private const int EhUbHistorySize = 120; // ~30s à 4Hz
+        // ===================== [E9] Moniteur ArtNet =====================
+        private readonly ArtNetListener _artnetListener = new();                    // Écoute UDP 6454
+        private readonly ConcurrentDictionary<int, ArtnetFrameRow> _artnetLatest = new(); // Dernier paquet reçu par univers
 
-        // === [E9] ArtNet Monitor ===
-        private readonly ArtNetListener _artnetListener = new();
+        [ObservableProperty] private bool isArtnetMonitorEnabled;   // Toggle ON/OFF
+        public ObservableCollection<ArtnetFrameRow> ArtnetFrames { get; } = new(); // Snapshot affiché dans l’UI
 
-        // --- E9: snapshot par univers ---
-        private readonly ConcurrentDictionary<int, ArtnetFrameRow> _artnetLatest = new();
+        // ===================== [E10] Faker plein écran =====================
+        private readonly EHubFaker _fullFaker = new();
 
-        [ObservableProperty] private bool isArtnetMonitorEnabled;
-        public ObservableCollection<ArtnetFrameRow> ArtnetFrames { get; } = new();
+        [ObservableProperty] private bool isFullFakerEnabled;   // Toggle ON/OFF du faker
+        [ObservableProperty] private byte colorR = 255;         // Valeur Rouge par défaut
+        [ObservableProperty] private byte colorG = 255;         // Valeur Verte par défaut
+        [ObservableProperty] private byte colorB = 255;         // Valeur Bleue par défaut
 
+        // ===================== [E2] Stats générales =====================
+        [ObservableProperty] private int messagesReceived;      // Nombre total de messages eHuB reçus
+        [ObservableProperty] private int activeEntities;        // Nombre d’entités actives
+        [ObservableProperty] private int packetsSent;           // Nombre de paquets ArtNet envoyés
+        [ObservableProperty] private int totalUniverses;        // Nombre total d’univers DMX gérés
+        [ObservableProperty] private int totalMappings;         // Nombre d’entités mappées
+        [ObservableProperty] private int activeFrames;          // Nombre de trames DMX actives
+
+        // ===================== [E2] Moniteur eHuB =====================
+        [ObservableProperty] private bool isEhubMonitorEnabled; // Toggle ON/OFF
+        [ObservableProperty] private int ehubFps;               // Messages/s calculé
+        public ObservableCollection<int> EhubFpsHistory { get; } = new(); // Historique du FPS
+
+        // ===================== [E5] Moniteur DMX (sortie ArtNet) =====================
+        [ObservableProperty] private bool showActiveUniversesOnly = true; // Filtre ON/OFF
+        public ObservableCollection<UniverseRow> UniverseRows { get; } = new();
+
+        [ObservableProperty] private int totalPps;  // Paquets/s total
+        [ObservableProperty] private int totalBps;  // Octets/s total
+
+        // ===================== Moniteur DMX (par univers) =====================
+        [ObservableProperty] private bool isMonitorEnabled;     // Toggle moniteur instantané ON/OFF
+        [ObservableProperty] private List<int> universeOptions = new();
+        [ObservableProperty] private int selectedUniverse;      // Univers sélectionné dans l’UI
+        [ObservableProperty] private FrameInfo? currentFrame;   // Trame courante (snapshot)
+
+        // ===================== [E8] Patch Map =====================
+        [ObservableProperty] private bool isPatchEnabled;       // Toggle appliquer/ignorer
+        [ObservableProperty] private string? patchFilePath;     // Fichier CSV chargé
+        [ObservableProperty] private int patchRuleCount;        // Nombre de règles
+        public ObservableCollection<PatchRuleRow> PatchRules { get; } = new();
+
+        // ===================== Constructeur =====================
         public StatsViewModel(Router router, EHubReceiver receiver, ArtNetSender sender)
         {
             _router = router;
             _receiver = receiver;
             _sender = sender;
 
-            // Initialisation des univers configurés
+            // Univers disponibles
             UniverseOptions = _router.GetConfiguredUniverses().ToList();
             if (UniverseOptions.Any())
                 SelectedUniverse = UniverseOptions.First();
 
-            // Timer pour rafraîchir les statistiques et la vue du moniteur à 4 Hz
+            // Timer pour refresh UI (250ms = 4Hz)
             _statsTimer = new Timer(250);
             _statsTimer.Elapsed += (_, __) => Refresh();
             _statsTimer.Start();
 
-            // Souscription aux trames
-            _sender.FrameSent += OnFrameSent;
-
-            // E9: on s'abonne aux frames reçues
-            _artnetListener.FrameReceived += OnArtnetFrameReceived;
+            // Abonnements
+            _sender.FrameSent += OnFrameSent;                  // Envoi DMX
+            _artnetListener.FrameReceived += OnArtnetFrameReceived; // Réception ArtNet
         }
 
+        // ===================== [E9] Gestion Moniteur ArtNet =====================
         private void OnArtnetFrameReceived(ArtnetFrameRow row)
         {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            Dispatcher.UIThread.Post(() =>
             {
-                // bornage à 200 lignes par ex.
-                // if (ArtnetFrames.Count >= 200) ArtnetFrames.RemoveAt(0);
-                // ArtnetFrames.Add(row);
+                // On garde seulement le dernier paquet par univers
                 _artnetLatest[row.Universe] = row;
             });
         }
-
 
         partial void OnIsArtnetMonitorEnabledChanged(bool value)
         {
@@ -83,27 +123,19 @@ namespace EmitterHub.UI.ViewModels
             else _artnetListener.Stop();
         }
 
-        private readonly EHubFaker _fullFaker = new();
-
-        // toggle UI
-        [ObservableProperty] private bool isFullFakerEnabled;
-        [ObservableProperty] private byte colorR = 255;
-        [ObservableProperty] private byte colorG = 255;
-        [ObservableProperty] private byte colorB = 255;
-
-        // Quand on coche/ décoche le toggle
+        // ===================== [E10] Gestion Faker plein écran =====================
         partial void OnIsFullFakerEnabledChanged(bool value)
         {
             if (value)
             {
-                // 1) passer les ranges mappés au faker
+                // Charger les plages d’entités depuis le Router
                 var ranges = _router.GetEntityRanges();
                 _fullFaker.SetRangesFromRouter(ranges);
 
-                // 2) aligner l’univers eHuB
-                _fullFaker.EhubUniverse = 1; // idem receiver
+                // Forcer l’univers eHuB (doit matcher Receiver)
+                _fullFaker.EhubUniverse = 1;
 
-                // 3) couleur courante
+                // Appliquer la couleur courante
                 _fullFaker.SolidR = ColorR;
                 _fullFaker.SolidG = ColorG;
                 _fullFaker.SolidB = ColorB;
@@ -116,7 +148,6 @@ namespace EmitterHub.UI.ViewModels
             }
         }
 
-        // Bouton “Appliquer à l’écran” (met à jour la couleur à la volée)
         [RelayCommand]
         private void ApplySolidColor()
         {
@@ -125,43 +156,7 @@ namespace EmitterHub.UI.ViewModels
             _fullFaker.SolidB = ColorB;
         }
 
-
-
-        // --- Propriétés de statistiques ---
-        [ObservableProperty] private int messagesReceived;
-        [ObservableProperty] private int activeEntities;
-        [ObservableProperty] private int packetsSent;
-        [ObservableProperty] private int totalUniverses;
-        [ObservableProperty] private int totalMappings;
-        [ObservableProperty] private int activeFrames;
-
-        // --- Propriétés du moniteur ---
-        [ObservableProperty] private bool isMonitorEnabled;
-        [ObservableProperty] private List<int> universeOptions = new();
-        [ObservableProperty] private int selectedUniverse;
-        [ObservableProperty] private FrameInfo? currentFrame;
-
-        // [E2] --- Moniteur eHuB ---
-        [ObservableProperty] private bool isEhubMonitorEnabled;     // toggle
-        [ObservableProperty] private int ehubFps;                   // FPS instantané (messages/s)
-        public ObservableCollection<int> EhubFpsHistory { get; } = new(); // historique borné 0..60
-
-        // [E5] --- Moniteur DMX (liste univers) ---
-        [ObservableProperty] private bool showActiveUniversesOnly = true;
-        public ObservableCollection<UniverseRow> UniverseRows { get; } = new();
-
-        [ObservableProperty] private int totalPps; // paquets/s total
-        [ObservableProperty] private int totalBps; // octets/s total
-
-
-        // [E8] --- Patch Map ---
-        [ObservableProperty] private bool isPatchEnabled;      // toggle appliquer/ignorer
-        [ObservableProperty] private string? patchFilePath;
-        [ObservableProperty] private int patchRuleCount;
-
-        public ObservableCollection<PatchRuleRow> PatchRules { get; } = new();
-
-        // commande : Charger un CSV de patch
+        // ===================== [E8] Gestion Patch Map =====================
         [RelayCommand]
         private async Task LoadPatchCsvAsync()
         {
@@ -182,18 +177,16 @@ namespace EmitterHub.UI.ViewModels
                 };
 
                 var res = await ofd.ShowAsync(window);
-
                 if (res is null || res.Length == 0) return;
 
                 var path = res[0];
                 var map = CsvPatchLoader.Load(path);
 
-                // appliquer côté router mais sans activer automatiquement
-                _router.SetPatchMap(map);
+                _router.SetPatchMap(map);   // On enregistre le patch dans le router
                 PatchFilePath = path;
                 PatchRuleCount = map.Rules.Count;
 
-                // remplir l'UI
+                // Mise à jour de l’UI
                 PatchRules.Clear();
                 foreach (var r in map.Rules)
                 {
@@ -212,33 +205,12 @@ namespace EmitterHub.UI.ViewModels
             }
         }
 
-        // toggle appliquer/ignorer (ON = appliqué)
         partial void OnIsPatchEnabledChanged(bool value)
         {
             _router.EnablePatch(value);
         }
 
-        // helper pour récupérer la fenêtre²
-        private static Window? GetMainWindow()
-        {
-            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                return desktop.MainWindow;
-            }
-            return null;
-        }
-
-        // Row pour DataGrid
-        public class PatchRuleRow
-        {
-            public int SrcUniverse { get; set; }
-            public int SrcChannel { get; set; }
-            public int DstUniverse { get; set; }
-            public int DstChannel { get; set; }
-        }
-
-
-
+        // ===================== Gestion Moniteur DMX =====================
         partial void OnIsMonitorEnabledChanged(bool value)
         {
             if (!value)
@@ -250,13 +222,12 @@ namespace EmitterHub.UI.ViewModels
             CurrentFrame = null;
         }
 
-        // Capture la trame reçue mais ne met pas à jour l'UI immédiatement
         private void OnFrameSent(DmxFrame frame)
         {
             if (!IsMonitorEnabled || frame.Universe != SelectedUniverse)
                 return;
 
-            // Clone pour thread-safety
+            // On clone les canaux pour éviter tout problème de thread-safety
             var channels = frame.Channels.ToArray();
             _pendingFrame = new FrameInfo(
                 frame.Universe,
@@ -266,88 +237,76 @@ namespace EmitterHub.UI.ViewModels
             );
         }
 
-        // Met à jour stats et moniteur à intervalle régulier sur le thread UI
+        // ===================== Refresh global (toutes les 250ms) =====================
         private void Refresh()
         {
             Dispatcher.UIThread.Post(() =>
             {
-                // Statistiques générales
+                // Stats générales
                 MessagesReceived = _receiver.MessagesReceived;
-                ActiveEntities = _receiver.ActiveEntities;
-                PacketsSent = _sender.PacketsSent;
+                ActiveEntities   = _receiver.ActiveEntities;
+                PacketsSent      = _sender.PacketsSent;
 
                 var stats = _router.GetStats();
-                TotalUniverses = stats.TotalUniverses;
-                TotalMappings = stats.TotalEntities;
-                ActiveFrames = stats.ActiveFrames;
+                TotalUniverses   = stats.TotalUniverses;
+                TotalMappings    = stats.TotalEntities;
+                ActiveFrames     = stats.ActiveFrames;
 
-                // [E2] Calcul FPS eHuB + historique (uniquement si activé)
+                // [E2] FPS eHuB
                 if (IsEhubMonitorEnabled)
                 {
-                    int cur = _receiver.MessagesReceived;
+                    int cur   = _receiver.MessagesReceived;
                     int delta = Math.Max(0, cur - _prevMsgCount);
                     _prevMsgCount = cur;
 
-                    // timer = 250ms -> *4 pour messages/s
                     int fps = (int)Math.Round(delta * (1000.0 / _statsTimer.Interval));
-                    // borne visuelle 0..60 pour notre graphe vertical de 60px
                     fps = Math.Clamp(fps, 0, 60);
 
                     EhubFps = fps;
-
                     if (EhubFpsHistory.Count >= EhUbHistorySize)
                         EhubFpsHistory.RemoveAt(0);
                     EhubFpsHistory.Add(fps);
                 }
                 else
                 {
-                    // quand OFF, on ne fait rien et on fige l'historique
                     _prevMsgCount = _receiver.MessagesReceived;
                 }
 
-                // [E5] récupérer snapshot DMX
+                // [E5] Snapshot DMX par univers
                 int pps, bps;
                 var rows = _sender.GetStatsSnapshot(ShowActiveUniversesOnly, out pps, out bps);
-
                 TotalPps = pps;
                 TotalBps = bps;
 
-                // Sync minimal (remplace tout : simple et suffisant à 4 Hz)
                 UniverseRows.Clear();
                 foreach (var r in rows)
                 {
                     UniverseRows.Add(new UniverseRow
                     {
-                        Universe = r.Universe,
-                        TargetIP = r.TargetIP,
-                        PacketRatePerSec = r.PacketRatePerSec,
-                        ByteRatePerSec = r.ByteRatePerSec,
-                        LastActiveChannels = r.LastActiveChannels,
-                        LastSent = r.LastSentLocal.ToString("HH:mm:ss")
+                        Universe          = r.Universe,
+                        TargetIP          = r.TargetIP,
+                        PacketRatePerSec  = r.PacketRatePerSec,
+                        ByteRatePerSec    = r.ByteRatePerSec,
+                        LastActiveChannels= r.LastActiveChannels,
+                        LastSent          = r.LastSentLocal.ToString("HH:mm:ss")
                     });
                 }
 
-                // Mise à jour du moniteur en temps réel
+                // Moniteur DMX instantané
                 if (IsMonitorEnabled)
-                {
                     CurrentFrame = _pendingFrame;
-                }
 
-                // --- E9: pousser l’instantané à l’UI 4 Hz ---
+                // [E9] Snapshot ArtNet
                 if (IsArtnetMonitorEnabled)
                 {
-                    // on prend un snapshot thread-safe
-                    var snapshot = _artnetLatest.Values
-                                    .OrderBy(v => v.Universe)
-                                    .ToList();
-
+                    var snapshot = _artnetLatest.Values.OrderBy(v => v.Universe).ToList();
                     ArtnetFrames.Clear();
-                    foreach (var r in snapshot)
-                        ArtnetFrames.Add(r);
+                    foreach (var r in snapshot) ArtnetFrames.Add(r);
                 }
             });
         }
 
+        // ===================== Commandes =====================
         [RelayCommand]
         private async Task StopRouterAsync()
         {
@@ -371,14 +330,22 @@ namespace EmitterHub.UI.ViewModels
             CurrentFrame = null;
             _pendingFrame = null;
         }
+
+        // ===================== Helpers =====================
+        private static Window? GetMainWindow()
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                return desktop.MainWindow;
+            return null;
+        }
     }
 
+    // ===================== Structures auxiliaires =====================
     public record FrameInfo(int Universe, string TargetIP, int ActiveChannels, byte[] Channels)
     {
         public string DisplayText => $"U{Universe} → {TargetIP} ({ActiveChannels} canaux)";
     }
 
-    // [E5] Row pour le tableau
     public class UniverseRow
     {
         public int Universe { get; set; }
@@ -389,8 +356,11 @@ namespace EmitterHub.UI.ViewModels
         public string LastSent { get; set; } = "";
     }
 
-    
-
-    
-
+    public class PatchRuleRow
+    {
+        public int SrcUniverse { get; set; }
+        public int SrcChannel { get; set; }
+        public int DstUniverse { get; set; }
+        public int DstChannel { get; set; }
+    }
 }
