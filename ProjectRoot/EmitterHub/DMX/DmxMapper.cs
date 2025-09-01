@@ -147,6 +147,19 @@ public class DmxMapper
         _entityMappings.Clear();
         _frames.Clear();
     }
+
+    public void ApplyUpdatesIncremental(Dictionary<ushort, EntityState> updated)
+    {
+        foreach (var entity in updated.Values)
+        {
+            if (_entityMappings.TryGetValue(entity.Id, out var map) &&
+                _frames.TryGetValue(map.Universe, out var frame))
+            {
+                frame.SetRGB(map.DmxChannel, entity.R, entity.G, entity.B);
+            }
+        }
+    }
+
 }
 
 /// <summary>

@@ -80,7 +80,7 @@ public class Router
             return;
 
         _cancellation = new CancellationTokenSource();
-        _receiver.EntitiesUpdated += OnEntitiesUpdated;
+        // _receiver.EntitiesUpdated += OnEntitiesUpdated;
 
         Console.WriteLine("Démarrage du router...");
         await _receiver.StartAsync();
@@ -171,7 +171,8 @@ public class Router
     /// </summary>
     private void OnEntitiesUpdated(Dictionary<ushort, EntityState> updated)
     {
-        _mapper.UpdateEntities(updated);
+        // _mapper.UpdateEntities(updated);
+        _mapper.ApplyUpdatesIncremental(updated);
     }
 
     private void LogDmxFrameToFile(DmxFrame frame)
