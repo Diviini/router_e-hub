@@ -2,6 +2,12 @@ using EmitterHub.eHub;
 
 namespace EmitterHub.DMX;
 
+public class EntityRange
+    {
+        public ushort Start { get; set; }
+        public ushort End   { get; set; }
+    }
+
 /// <summary>
 /// Mappe les entités vers les trames DMX selon la configuration
 /// </summary>
@@ -9,6 +15,8 @@ public class DmxMapper
 {
     private readonly Dictionary<int, DmxFrame> _frames;
     private readonly Dictionary<ushort, EntityMapping> _entityMappings;
+
+    private readonly List<EntityRange> _declaredRanges = new();
 
     public DmxMapper()
     {
@@ -47,7 +55,10 @@ public class DmxMapper
     ushort universeEnd,
     string channelMode,
     ushort dmxStartChannel)
-{
+    {
+        // range “déclaré” (on le garde tel quel – utile pour le Faker)
+        _declaredRanges.Add(new EntityRange { Start = entityStart, End = entityEnd });
+
 
         int totalEntities = entityEnd - entityStart + 1;
         int universesCount = universeEnd - universeStart + 1;
@@ -71,6 +82,8 @@ public class DmxMapper
             }
         }
     }
+
+    public IReadOnlyList<EntityRange> GetDeclaredRanges() => _declaredRanges;
 
     /// <summary>
     /// Met à jour les trames DMX avec les nouvelles données d'entités
@@ -134,6 +147,19 @@ public class DmxMapper
         _entityMappings.Clear();
         _frames.Clear();
     }
+
+    public void ApplyUpdatesIncremental(Dictionary<ushort, EntityState> updated)
+    {
+        foreach (var entity in updated.Values)
+        {
+            if (_entityMappings.TryGetValue(entity.Id, out var map) &&
+                _frames.TryGetValue(map.Universe, out var frame))
+            {
+                frame.SetRGB(map.DmxChannel, entity.R, entity.G, entity.B);
+            }
+        }
+    }
+
 }
 
 /// <summary>
