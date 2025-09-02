@@ -63,6 +63,8 @@ namespace EmitterHub.UI.ViewModels
         // ===================== [E2] Moniteur eHuB =====================
         [ObservableProperty] private bool isEhubMonitorEnabled; // Toggle ON/OFF
         [ObservableProperty] private int ehubFps;               // Messages/s calculé
+        [ObservableProperty] private int ehubFpsRaw;      // valeur réelle, non bornée
+        [ObservableProperty] private int ehubFpsDisplay;  // valeur bornée pour l’UI
         public ObservableCollection<int> EhubFpsHistory { get; } = new(); // Historique du FPS
 
         // ===================== [E5] Moniteur DMX (sortie ArtNet) =====================
@@ -256,16 +258,20 @@ namespace EmitterHub.UI.ViewModels
                 if (IsEhubMonitorEnabled)
                 {
                     int cur = _receiver.MessagesReceived;
+
                     int delta = Math.Max(0, cur - _prevMsgCount);
                     _prevMsgCount = cur;
+                    int fpsRaw = (int)Math.Round(delta * (1000.0 / _statsTimer.Interval)); // non borné
+                    EhubFpsRaw = fpsRaw;
+                    
+                    int fpsDisplay = Math.Clamp(fpsRaw, 0, 60); // juste pour la sparkline
+                    EhubFpsDisplay = fpsDisplay;
 
-                    int fps = (int)Math.Round(delta * (1000.0 / _statsTimer.Interval.TotalMilliseconds));
-                    fps = Math.Clamp(fps, 0, 60);
+                    // Historique pour la sparkline → on pousse la version bornée
+                    if (EhubFpsHistory.Count >= EhUbHistorySize) EhubFpsHistory.RemoveAt(0);
+                    EhubFpsHistory.Add(fpsRaw);
 
-                    EhubFps = fps;
-                    if (EhubFpsHistory.Count >= EhUbHistorySize)
-                        EhubFpsHistory.RemoveAt(0);
-                    EhubFpsHistory.Add(fps);
+
                 }
                 else
                 {
