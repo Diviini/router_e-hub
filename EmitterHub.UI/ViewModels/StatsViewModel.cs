@@ -31,8 +31,7 @@ namespace EmitterHub.UI.ViewModels
         private readonly Router _router;            // Responsable du routage entités -> DMX
         private readonly EHubReceiver _receiver;    // Récepteur eHuB (messages Unity/Faker)
         private readonly ArtNetSender _sender;      // Émetteur ArtNet
-        private readonly Timer _statsTimer;         // Timer 250ms pour rafraîchir l’UI
-
+        private readonly DispatcherTimer _statsTimer;
         // ===================== Etats internes =====================
         private FrameInfo? _pendingFrame;           // Dernière trame DMX en attente (pour le moniteur instantané)
         private int _prevMsgCount = 0;              // Pour calcul du FPS eHuB
@@ -88,6 +87,7 @@ namespace EmitterHub.UI.ViewModels
         public ObservableCollection<PatchRuleRow> PatchRules { get; } = new();
 
         // ===================== Constructeur =====================
+
         public StatsViewModel(Router router, EHubReceiver receiver, ArtNetSender sender)
         {
             _router = router;
@@ -100,8 +100,8 @@ namespace EmitterHub.UI.ViewModels
                 SelectedUniverse = UniverseOptions.First();
 
             // Timer pour refresh UI (250ms = 4Hz)
-            _statsTimer = new Timer(250);
-            _statsTimer.Elapsed += (_, __) => Refresh();
+            _statsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+            _statsTimer.Tick += (_, __) => Refresh();
             _statsTimer.Start();
 
             // Abonnements
@@ -246,28 +246,18 @@ namespace EmitterHub.UI.ViewModels
             {
                 // Stats générales
                 MessagesReceived = _receiver.MessagesReceived;
-                ActiveEntities   = _receiver.ActiveEntities;
-                PacketsSent      = _sender.PacketsSent;
+                ActiveEntities = _receiver.ActiveEntities;
+                PacketsSent = _sender.PacketsSent;
 
                 var stats = _router.GetStats();
-                TotalUniverses   = stats.TotalUniverses;
-                TotalMappings    = stats.TotalEntities;
-                ActiveFrames     = stats.ActiveFrames;
+                TotalUniverses = stats.TotalUniverses;
+                TotalMappings = stats.TotalEntities;
+                ActiveFrames = stats.ActiveFrames;
 
                 // [E2] FPS eHuB
                 if (IsEhubMonitorEnabled)
                 {
                     int cur = _receiver.MessagesReceived;
-                    // int delta = Math.Max(0, cur - _prevMsgCount);
-                    // _prevMsgCount = cur;
-
-                    // int fps = (int)Math.Round(delta * (1000.0 / _statsTimer.Interval));
-                    // fps = Math.Clamp(fps, 0, 60);
-
-                    // EhubFps = fps;
-                    // if (EhubFpsHistory.Count >= EhUbHistorySize)
-                    //     EhubFpsHistory.RemoveAt(0);
-                    // EhubFpsHistory.Add(fps);
 
                     int delta = Math.Max(0, cur - _prevMsgCount);
                     _prevMsgCount = cur;
@@ -280,6 +270,7 @@ namespace EmitterHub.UI.ViewModels
                     // Historique pour la sparkline → on pousse la version bornée
                     if (EhubFpsHistory.Count >= EhUbHistorySize) EhubFpsHistory.RemoveAt(0);
                     EhubFpsHistory.Add(fpsRaw);
+
 
                 }
                 else
@@ -298,12 +289,12 @@ namespace EmitterHub.UI.ViewModels
                 {
                     UniverseRows.Add(new UniverseRow
                     {
-                        Universe          = r.Universe,
-                        TargetIP          = r.TargetIP,
-                        PacketRatePerSec  = r.PacketRatePerSec,
-                        ByteRatePerSec    = r.ByteRatePerSec,
-                        LastActiveChannels= r.LastActiveChannels,
-                        LastSent          = r.LastSentLocal.ToString("HH:mm:ss")
+                        Universe = r.Universe,
+                        TargetIP = r.TargetIP,
+                        PacketRatePerSec = r.PacketRatePerSec,
+                        ByteRatePerSec = r.ByteRatePerSec,
+                        LastActiveChannels = r.LastActiveChannels,
+                        LastSent = r.LastSentLocal.ToString("HH:mm:ss")
                     });
                 }
 

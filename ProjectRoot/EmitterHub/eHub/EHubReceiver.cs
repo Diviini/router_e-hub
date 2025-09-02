@@ -99,32 +99,35 @@ public class EHubReceiver : IDisposable
 
     private async Task ProcessConfigMessage(byte[] buffer)
     {
-        // Minimum = header eHuB (6) + 1 groupe (8) = 14 octets
-        if (buffer.Length < 14) return;
+        // header eHuB (4) + type (1) + universe (1) + count (2) + size (2)
+        if (buffer.Length < 10) return;
 
-        int offset = 2; // On saute type (1 byte) et universe (1 byte)
+        ushort rangesCount = BitConverter.ToUInt16(buffer, 6);
+        ushort compressedSize = BitConverter.ToUInt16(buffer, 8);
+        if (buffer.Length < 10 + compressedSize) return;
 
-        while (offset + 8 <= buffer.Length)
+        byte[] compressed = new byte[compressedSize];
+        Array.Copy(buffer, 10, compressed, 0, compressedSize);
+        byte[] decompressed = Decompress(compressed);
+
+        // Chaque bloc = 8 octets : startIndex,startId,endIndex,endId (ushort chacun)
+        if (decompressed.Length < rangesCount * 8) return;
+
+        _indexToEntityId.Clear();
+        for (int i = 0; i < rangesCount; i++)
         {
-            ushort startIndex = BitConverter.ToUInt16(buffer, offset);
-            ushort startId = BitConverter.ToUInt16(buffer, offset + 2);
-            ushort endIndex = BitConverter.ToUInt16(buffer, offset + 4);
-            ushort endId = BitConverter.ToUInt16(buffer, offset + 6);
+            int off = i * 8;
+            ushort si = BitConverter.ToUInt16(decompressed, off + 0);
+            ushort sid = BitConverter.ToUInt16(decompressed, off + 2);
+            ushort ei = BitConverter.ToUInt16(decompressed, off + 4);
+            ushort eid = BitConverter.ToUInt16(decompressed, off + 6);
 
-            // Console.WriteLine($"🔧 Config : Index {startIndex}-{endIndex} → Entités {startId}-{endId}");
-
-            for (ushort index = startIndex, id = startId;
-                 index <= endIndex && id <= endId;
-                 index++, id++)
-            {
-                _indexToEntityId[index] = id;
-            }
-
-            offset += 8;
+            for (ushort idx = si, id = sid; idx <= ei && id <= eid; idx++, id++)
+                _indexToEntityId[idx] = id;
         }
-
         Console.WriteLine($"📌 {_indexToEntityId.Count} index configurés.");
     }
+
 
 
     private async Task ProcessUpdateMessage(byte[] buffer)

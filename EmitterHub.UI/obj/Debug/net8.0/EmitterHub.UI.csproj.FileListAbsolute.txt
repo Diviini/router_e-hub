@@ -80,3 +80,4 @@ C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\obj\Debug\net8.0\E
 C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\obj\Debug\net8.0\ref\EmitterHub.UI.dll
 C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Debug\net8.0\CommunityToolkit.Mvvm.dll
 C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Debug\net8.0\Config\mapping_clean.csv
+C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Debug\net8.0\Avalonia.Controls.DataGrid.dll

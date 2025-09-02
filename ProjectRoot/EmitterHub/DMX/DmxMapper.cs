@@ -3,10 +3,10 @@ using EmitterHub.eHub;
 namespace EmitterHub.DMX;
 
 public class EntityRange
-    {
-        public ushort Start { get; set; }
-        public ushort End   { get; set; }
-    }
+{
+    public ushort Start { get; set; }
+    public ushort End { get; set; }
+}
 
 /// <summary>
 /// Mappe les entités vers les trames DMX selon la configuration
@@ -48,34 +48,31 @@ public class DmxMapper
     /// Ajoute un mapping pour une plage d'entités
     /// </summary>
     public void AddEntityRangeMapping(
-    ushort entityStart,
-    ushort entityEnd,
-    string ip,
-    ushort universeStart,
-    ushort universeEnd,
-    string channelMode,
-    ushort dmxStartChannel)
+        ushort entityStart, ushort entityEnd, string ip,
+        ushort universeStart, ushort universeEnd,
+        string channelMode, ushort dmxStartChannel)
     {
-        // range “déclaré” (on le garde tel quel – utile pour le Faker)
         _declaredRanges.Add(new EntityRange { Start = entityStart, End = entityEnd });
 
-
-        int totalEntities = entityEnd - entityStart + 1;
-        int universesCount = universeEnd - universeStart + 1;
+        int stride = channelMode.ToUpperInvariant() switch
+        {
+            "RGBW" => 4,
+            "RGB" => 3,
+            _ => 3
+        };
 
         ushort currentEntity = entityStart;
         ushort currentUniverse = universeStart;
-        ushort currentChannel = 1;
+        int currentChannel = Math.Clamp((int)dmxStartChannel, 1, 512);
 
-        for (int i = 0; i < totalEntities; i++)
+        while (currentEntity <= entityEnd && currentUniverse <= universeEnd)
         {
             AddEntityMapping(currentEntity, ip, currentUniverse, currentChannel);
 
             currentEntity++;
-            currentChannel += 3; // RGB = 3 canaux
+            currentChannel += stride;
 
-            // Passer à l'univers suivant si nécessaire
-            if (currentChannel > 512 - 2) // Garder de la place pour les 3 canaux RGB
+            if (currentChannel + (stride - 1) > DmxFrame.DMX_CHANNELS)
             {
                 currentUniverse++;
                 currentChannel = 1;
