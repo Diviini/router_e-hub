@@ -9,7 +9,7 @@ namespace EmitterHub.eHub
     {
         private readonly UdpClient _udp = new();
         private readonly IPEndPoint _target;
-        private readonly CancellationTokenSource _cts = new();
+        private CancellationTokenSource? _cts;
 
         public int EhubUniverse { get; set; } = 1; // aligne avec ton receiver
         public byte SolidR { get; set; } = 255;
@@ -44,7 +44,7 @@ namespace EmitterHub.eHub
             {
                 int len = end - start + 1;
                 ushort startIndex = (ushort)runningIndex;
-                ushort endIndex   = (ushort)(runningIndex + len - 1);
+                ushort endIndex = (ushort)(runningIndex + len - 1);
                 _indexToId.Add((startIndex, start, endIndex, end));
                 runningIndex += len;
             }
@@ -52,6 +52,8 @@ namespace EmitterHub.eHub
 
         public void Start()
         {
+            if (_cts != null && !_cts.IsCancellationRequested) return;
+            _cts = new CancellationTokenSource();
             _ = Task.Run(async () =>
             {
                 try
