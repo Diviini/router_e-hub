@@ -6,8 +6,8 @@ namespace EmitterHub.ArtNet
 {
     public class ArtNetListener : IDisposable
     {
-        private readonly UdpClient _udp;
-        private readonly CancellationTokenSource _cts = new();
+        private UdpClient _udp;
+        private CancellationTokenSource? _cts;
 
         public event Action<ArtnetFrameRow>? FrameReceived;
 
@@ -21,6 +21,8 @@ namespace EmitterHub.ArtNet
 
         public void Start()
         {
+            if (_cts != null && !_cts.IsCancellationRequested) return;
+            _cts = new CancellationTokenSource();
             _ = Task.Run(Loop);
         }
 
@@ -28,7 +30,7 @@ namespace EmitterHub.ArtNet
         {
             try
             {
-                while (!_cts.IsCancellationRequested)
+                while (_cts != null && !_cts.IsCancellationRequested)
                 {
                     var res = await _udp.ReceiveAsync(_cts.Token);
                     var info = ArtNetPacket.ParsePacket(res.Buffer);
@@ -36,11 +38,11 @@ namespace EmitterHub.ArtNet
                     {
                         var row = new ArtnetFrameRow
                         {
-                            Universe        = info.Universe,
-                            Length          = info.DataLength,
-                            ActiveChannels  = info.ActiveChannels,
-                            SourceIP        = res.RemoteEndPoint.Address.ToString(),
-                            Timestamp       = DateTime.Now
+                            Universe = info.Universe,
+                            Length = info.DataLength,
+                            ActiveChannels = info.ActiveChannels,
+                            SourceIP = res.RemoteEndPoint.Address.ToString(),
+                            Timestamp = DateTime.Now
                         };
                         FrameReceived?.Invoke(row);
                     }
@@ -53,7 +55,7 @@ namespace EmitterHub.ArtNet
             }
         }
 
-        public void Stop() => _cts.Cancel();
+        public void Stop() => _cts?.Cancel();
 
         public void Dispose()
         {

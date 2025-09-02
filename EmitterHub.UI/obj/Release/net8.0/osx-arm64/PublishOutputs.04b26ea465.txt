@@ -1,0 +1,9 @@
+C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Release\net8.0\osx-arm64\publish\EmitterHub.UI.pdb
+C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Release\net8.0\osx-arm64\publish\EmitterHub
+C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Release\net8.0\osx-arm64\publish\EmitterHub.runtimeconfig.json
+C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Release\net8.0\osx-arm64\publish\Config\mapping_clean.csv
+C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Release\net8.0\osx-arm64\publish\libAvaloniaNative.dylib
+C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Release\net8.0\osx-arm64\publish\libHarfBuzzSharp.dylib
+C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Release\net8.0\osx-arm64\publish\libSkiaSharp.dylib
+C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Release\net8.0\osx-arm64\publish\EmitterHub.pdb
+C:\Users\Robin_SC\Desktop\HETIC\S1\router_e-hub\EmitterHub.UI\bin\Release\net8.0\osx-arm64\publish\EmitterHub.UI

@@ -157,13 +157,9 @@ public class Router
     public async Task StopAsync()
     {
         Console.WriteLine("Arrêt du router...");
-        _cancellation.Cancel();
-        if (_cancellation != null)
-            _cancellation.Cancel();
+        _cancellation?.Cancel();
         _receiver.Stop();
-
-        if (_routingLoop != null)
-            await _routingLoop;
+        if (_routingLoop != null) await _routingLoop;
     }
 
     /// <summary>
