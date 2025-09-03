@@ -261,7 +261,7 @@ namespace EmitterHub.UI.ViewModels
 
                     int delta = Math.Max(0, cur - _prevMsgCount);
                     _prevMsgCount = cur;
-                    int fpsRaw = (int)Math.Round(delta * (1000.0 / _statsTimer.Interval)); // non borné
+                    int fpsRaw = (int)Math.Round(delta * (1000.0 / _statsTimer.Interval.TotalMilliseconds)); // non borné
                     EhubFpsRaw = fpsRaw;
                     
                     int fpsDisplay = Math.Clamp(fpsRaw, 0, 60); // juste pour la sparkline
